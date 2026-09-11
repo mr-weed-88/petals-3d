@@ -342,17 +342,21 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
                     onFocus={handleHexFocus}
                     onBlur={handleHexBlur}
                     maxLength={7}
-                    className="w-28 rounded-[4px] border-[1px] border-[#4B5563]/25 px-[8px] py-[4px] text-base text-[8px] font-bold text-[#000000] outline-none md:text-[12px]"
+                    className="w-28 rounded-[8px] border-[1px] border-line/25 bg-surface-2 px-[8px] py-[6px] text-[8px] font-bold text-ink tabular-nums focus:border-accent focus:outline-0 md:text-[12px]"
                     placeholder="#000000"
                 />
                 <button
                     type="button"
                     onClick={handleEyedropper}
-                    className="cursor-pointer rounded-full border-[1px] border-[#4B5563]/25 p-[4px]"
+                    className="cursor-pointer rounded-full border-[1px] border-line/25 p-[4px] hover:bg-accent/25"
                     title="Pick color from screen"
                     tabIndex={0}
                 >
-                    <IconColorPicker color="#000000" size={20} stroke={1} />
+                    <IconColorPicker
+                        color="currentColor"
+                        size={20}
+                        stroke={1}
+                    />
                 </button>
             </div>
 
@@ -378,7 +382,7 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
                     width={squareSize}
                     height={squareSize}
                     onMouseDown={handleSquareMouseDown}
-                    className="gesture-allowed absolute block rounded-sm border border-white"
+                    className="gesture-allowed absolute block rounded-sm border border-surface"
                     style={{
                         left: squareLeft,
                         top: squareLeft,

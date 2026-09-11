@@ -586,6 +586,11 @@ export interface ControlledLoftOptions {
     initialRadial?: number
     initialWaist?: number
     initialPolyCount?: number
+    /**
+     * Wireframe colour. Passed in rather than fixed here, so this helper
+     * stays unaware of the theme; the caller reads the palette.
+     */
+    wireColor?: string
 }
 
 /**
@@ -614,6 +619,7 @@ export function createControlledLoftedSurface(
         initialRadial = 0.5,
         initialWaist = 0.5,
         initialPolyCount = 0.5,
+        wireColor = '#F2F2F2',
     } = options
 
     let currentRadial = initialRadial
@@ -655,7 +661,7 @@ export function createControlledLoftedSurface(
             loftMesh = new THREE.Mesh(
                 currentGeometry,
                 new THREE.MeshBasicMaterial({
-                    color: new THREE.Color('#F2F2F2'),
+                    color: new THREE.Color(wireColor),
                     wireframe: true,
                     transparent: true,
                     opacity: 0.25,

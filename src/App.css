@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Funnel+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+@import 'react-toastify/dist/ReactToastify.css';
 @import 'tailwindcss';
 @config '../tailwind.config.js';
 
@@ -11,6 +12,127 @@
  * reach: document-level resets on html, body and #root, none of which are
  * rendered by React.
  */
+
+/*
+ * Theme tokens.
+ *
+ * These are the only place a UI colour is written. tailwind.config.js maps
+ * each one to a semantic class name, so components use `bg-surface` and
+ * `text-ink` rather than hex values, and neither needs a `dark:` variant.
+ *
+ * The matching values live in src/config/theme.ts, which is what the 3D
+ * scene reads: three.js needs real colours, not CSS variables. Change one,
+ * change the other.
+ *
+ * `.dark` is set on <html> by the theme store.
+ */
+:root {
+    --c-surface: #ffffff;
+    --c-surface-2: #f0fbf6;
+    --c-surface-3: #dff6eb;
+    --c-ink: #08221a;
+    --c-ink-muted: #3d6154;
+    --c-line: #2f5548;
+    /* The brand mint. The one colour that does not change between themes;
+       everything else is built around its hue. */
+    --c-accent: #00ffa5;
+    /* Sits on top of --c-accent. Near-black in both themes: the mint is
+       bright enough that dark text is the only readable choice on it. */
+    --c-accent-ink: #00160e;
+    --c-overlay: #0b2a20;
+
+    color-scheme: light;
+}
+
+/*
+ * Neutral near-black, on the same faintly cool grey as the canvas. The mint
+ * accent is the only colour in the dark theme; tinting the panels green too
+ * made them compete with it. Nothing is pure #000000, so the panels keep an
+ * edge against the tooltip and against a black desktop behind the window.
+ */
+.dark {
+    --c-surface: #141417;
+    --c-surface-2: #1c1c20;
+    --c-surface-3: #26262b;
+    --c-ink: #e6e6ea;
+    --c-ink-muted: #8c8c96;
+    --c-line: #3a3a42;
+    --c-accent: #00ffa5;
+    --c-accent-ink: #00160e;
+    --c-overlay: #0a0a0c;
+
+    color-scheme: dark;
+}
+
+/*
+ * react-toastify ships its own palette. These are the parts of it that only
+ * a variable can reach.
+ */
+:root {
+    --toastify-font-family: 'Funnel Sans', sans-serif;
+    --toastify-toast-bd-radius: 12px;
+    --toastify-toast-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+    --toastify-toast-min-height: 44px;
+    --toastify-toast-padding: 12px;
+
+    --toastify-icon-color-info: var(--c-accent);
+    --toastify-icon-color-success: #16b826;
+    --toastify-icon-color-error: #7f2315;
+}
+
+/*
+ * Toast chrome. These rules cannot move into a component: the library owns
+ * the markup, and its own stylesheet is unlayered, so Tailwind utilities
+ * passed through `className` would lose to it regardless of source order.
+ */
+.Toastify__toast {
+    /*
+     * Painted here rather than through `--toastify-color-light`, because that
+     * variable only reaches the toast via the library's own theme class. Which
+     * theme class it applies depends on a runtime prop, so a toast raised
+     * without one silently fell back to the library's white. Setting the
+     * ground on the element itself makes the theme unconditional.
+     *
+     * `surface-2` rather than `surface`: a notification sits over the canvas,
+     * which is already the plain surface in light mode, so a raised ground is
+     * what separates the two.
+     */
+    background: var(--c-surface-2);
+    color: var(--c-ink);
+
+    /* The library draws no border, so a toast floats with nothing holding it
+       to the page. This is the hairline the editor's panels use. */
+    border: 1px solid color-mix(in oklab, var(--c-line) 25%, transparent);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+/*
+ * The library hardcodes this to white, which is invisible against a light
+ * surface. It is the toast's own text colour at the weight the editor gives
+ * secondary controls.
+ */
+.Toastify__close-button {
+    color: var(--c-ink);
+    opacity: 0.5;
+}
+
+.Toastify__close-button:hover,
+.Toastify__close-button:focus-visible {
+    opacity: 1;
+}
+
+/*
+ * Below 480px the library drops the radius and goes full-bleed. The editor is
+ * a fixed-viewport app whose panels stay as floating cards at every width, so
+ * the toast keeps its card shape too.
+ */
+@media only screen and (max-width: 480px) {
+    .Toastify__toast {
+        margin-bottom: 8px;
+        border-radius: var(--toastify-toast-bd-radius);
+    }
+}
 
 /*
  * Document-level reset. These target html, body and #root, none of which
@@ -27,7 +149,7 @@ body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #ffffff;
+    background-color: var(--c-surface);
     overscroll-behavior: none;
     touch-action: none;
     -webkit-user-select: none;
@@ -41,7 +163,7 @@ body {
     width: 100%;
     height: 100%;
     overflow: hidden;
-    background-color: #ffffff;
+    background-color: var(--c-surface);
 }
 
 * {

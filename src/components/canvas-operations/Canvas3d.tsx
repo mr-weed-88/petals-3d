@@ -16,6 +16,8 @@ extend(THREE as unknown as Parameters<typeof extend>[0])
 
 import { canvasViewStore } from '../../hooks/useCanvasViewStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
+import { themeStore } from '../../hooks/useThemeStore'
+import { AXIS, SCENE } from '../../config/theme'
 
 import CanvasOperations from './CanvasOperations'
 
@@ -38,6 +40,9 @@ const Canvas3d = () => {
         sequentialLoading,
         setSequentialLoading,
     } = canvasRenderStore((state) => state)
+
+    const { resolved } = themeStore((state) => state)
+    const palette = SCENE[resolved]
 
     const [snaping, setSnaping] = useState(false)
 
@@ -196,31 +201,37 @@ const Canvas3d = () => {
 
             {(gridPlaneX || gridPlaneY || gridPlaneZ) && (
                 <group>
+                    {/* Axis colours are fixed; only the minor grid lines
+                        follow the theme, so they stay visible on a dark
+                        ground without glaring on a light one. */}
                     {gridPlaneX && (
                         <gridHelper
                             scale={1}
                             rotation={[0, 0, 0]}
-                            args={[50, 50, `#DE3163`, `#D3D3D3`]}
+                            args={[50, 50, AXIS.x, palette.grid]}
                         />
                     )}
 
                     {gridPlaneY && (
                         <gridHelper
                             rotation={[Math.PI / 2, 0, 0]}
-                            args={[50, 50, `#50C878`, `#D3D3D3`]}
+                            args={[50, 50, AXIS.y, palette.grid]}
                         />
                     )}
 
                     {gridPlaneZ && (
                         <gridHelper
                             rotation={[0, 0, Math.PI / 2]}
-                            args={[50, 50, `#0096FF`, `#D3D3D3`]}
+                            args={[50, 50, AXIS.z, palette.grid]}
                         />
                     )}
                 </group>
             )}
 
-            <ambientLight intensity={10} color="#FFFFFF" />
+            <ambientLight
+                intensity={palette.ambientIntensity}
+                color={palette.ambient}
+            />
 
             <SmoothFOV />
 

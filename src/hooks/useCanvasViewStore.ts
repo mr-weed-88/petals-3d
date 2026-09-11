@@ -29,9 +29,6 @@ export interface CanvasViewState {
 
     gridPlaneZ: boolean
     setGridPlaneZ: (show: boolean) => void
-
-    fovBackground: string
-    setFovBackground: (value: string) => void
 }
 
 export const canvasViewStore = create<CanvasViewState>((set) => ({
@@ -62,7 +59,4 @@ export const canvasViewStore = create<CanvasViewState>((set) => ({
 
     gridPlaneZ: false,
     setGridPlaneZ: (show) => set({ gridPlaneZ: show }),
-
-    fovBackground: '30% 100%',
-    setFovBackground: (value) => set({ fovBackground: value }),
 }))

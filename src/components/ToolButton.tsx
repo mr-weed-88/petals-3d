@@ -10,8 +10,8 @@ export interface ToolButtonProps {
 const ToolButton = ({ icon, condition }: ToolButtonProps) => {
     return (
         <button
-            className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold ${
-                condition ? 'bg-[#5CA367]' : 'hover:bg-[#5CA367]/25'
+            className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
+                condition ? 'bg-accent text-accent-ink' : 'hover:bg-accent/25'
             }`}
         >
             {icon}

@@ -23,7 +23,7 @@ const CubeStrokeIcon = ({ color, size }: IconProps) => {
                 width="11"
                 height="16"
                 transform="rotate(90 21.5 6.5)"
-                stroke="#000000"
+                stroke={color}
             />
 
             <mask id="path-3-inside-1_630_183" fill="#FFFFFF">
@@ -31,8 +31,8 @@ const CubeStrokeIcon = ({ color, size }: IconProps) => {
             </mask>
             <path
                 d="M2 3H4C5.65685 3 7 4.34315 7 6H5C5 5.44772 4.55228 5 4 5H2V3ZM7 18C7 19.6569 5.65685 21 4 21H2V19H4C4.55228 19 5 18.5523 5 18H7ZM2 20V4V20ZM4 3C5.65685 3 7 4.34315 7 6V18C7 19.6569 5.65685 21 4 21V19C4.55228 19 5 18.5523 5 18V6C5 5.44772 4.55228 5 4 5V3Z"
-                fill="#000000"
-                stroke="#000000"
+                fill={color}
+                stroke={color}
                 mask="url(#path-3-inside-1_630_183)"
             />
             <rect

@@ -1,82 +1,127 @@
 import type { ChangeEvent } from 'react'
 
+/**
+ * Thumb diameter in pixels. The browser insets a native thumb by half its
+ * width at each end so it never overhangs the track, and the fill has to
+ * follow the same rule or the two drift apart at the extremes.
+ */
+const THUMB = 14
+
 export interface RangeSliderProps {
-    /** Label above the track. Omitted renders an empty line, as before. */
+    /** Label above the track. Omitted in compact mode. */
     name?: string
     min: number
     max: number
     step: number
     value: number
-    /**
-     * CSS `background-size` painting the filled portion of the track,
-     * e.g. `"30% 100%"`. Held in the store alongside the value.
-     */
-    backgroundSize: string
     setUpdatingValue: (value: number) => void
-    setUpdatingBackground: (value: string) => void
+    /** Bare track with no label or readout, for sliders sitting inline. */
+    compact?: boolean
 }
 
+/**
+ * Matches the readout's precision to the step, so a step of 0.05 shows 1.45
+ * rather than the 1.4500000000000002 that floating-point addition produces.
+ */
+function format(value: number, step: number): string {
+    const decimals = (String(step).split('.')[1] ?? '').length
+    return value.toFixed(decimals)
+}
+
+/**
+ * The native control is present but invisible: it keeps keyboard support,
+ * assistive-technology semantics, and click-to-jump, while every pixel on
+ * screen is an ordinary div.
+ *
+ * That is deliberate. `input[type=range]` is styled through vendor
+ * pseudo-elements that differ per engine, and the parts a page cannot reach
+ * are drawn by the platform, so the same markup renders differently on
+ * Windows, macOS and Linux. Painting the track ourselves is the only way the
+ * slider looks identical everywhere.
+ */
 const RangeSlider = ({
     name,
     max,
     min,
     step,
     value,
-    backgroundSize,
     setUpdatingValue,
-    setUpdatingBackground,
+    compact = false,
 }: RangeSliderProps) => {
     function handleValueChange(e: ChangeEvent<HTMLInputElement>) {
-        e.preventDefault()
-
-        const nextValue = parseFloat(e.target.value)
-        setUpdatingValue(nextValue)
-
-        // The DOM hands these back as strings. The original relied on `-`
-        // coercing them, which TypeScript rejects.
-        const minValue = Number(e.target.min)
-        const maxValue = Number(e.target.max)
-        const span = maxValue - minValue
-
-        const filled = span === 0 ? 0 : ((nextValue - minValue) / span) * 100
-        setUpdatingBackground(`${filled}% 100%`)
+        setUpdatingValue(parseFloat(e.target.value))
     }
 
+    const span = max - min
+    const ratio =
+        span === 0 ? 0 : Math.min(1, Math.max(0, (value - min) / span))
+
+    /*
+     * Where the thumb centre actually sits, accounting for the inset above.
+     * The fill width and the thumb offset are both this value, so the fill
+     * always ends underneath the thumb rather than beside it.
+     *
+     * This replaces the `backgroundSize` string that each caller used to keep
+     * in its store next to the value. It is derived from the value, so there
+     * is no second copy to fall out of step.
+     */
+    const centre = `calc(${ratio * 100}% + ${(0.5 - ratio) * THUMB}px)`
+
+    const track = (
+        <div
+            className={`gesture-allowed relative flex h-[20px] items-center ${
+                compact ? 'w-[80px] md:w-[120px]' : 'w-full'
+            }`}
+        >
+            {/* First in the DOM so the layers below can react to its focus
+                and press states through `peer-*`. */}
+            <input
+                onChange={handleValueChange}
+                type="range"
+                step={step}
+                value={value}
+                min={min}
+                max={max}
+                aria-label={name}
+                className="peer absolute inset-0 size-full cursor-pointer appearance-none bg-transparent opacity-0"
+            />
+
+            {/* Painted layers. They sit above the input, so each has to stay
+                transparent to pointer events or it would swallow the drag. */}
+            <div className="pointer-events-none absolute h-[6px] w-full rounded-full bg-line/25" />
+            <div
+                className="pointer-events-none absolute h-[6px] rounded-full bg-accent"
+                style={{ width: centre }}
+            />
+            <div
+                className="pointer-events-none absolute size-[14px] -translate-x-1/2 rounded-full border-[2px] border-accent bg-surface shadow-sm transition-transform peer-focus-visible:ring-[2px] peer-focus-visible:ring-accent/50 peer-active:scale-110"
+                style={{ left: centre }}
+            />
+        </div>
+    )
+
+    if (compact) return track
+
+    /*
+     * One padded column owns the spacing for all three rows, so the label,
+     * the track and the readout share a single left edge no matter what
+     * padding the surrounding panel happens to use. Previously each row
+     * carried its own margins and they lined up differently per panel.
+     */
     return (
-        <>
-            <div className="p-[12px] font-funnel text-[8px] font-normal md:text-[12px]">
+        <div className="flex w-full flex-col gap-[12px] p-[8px] font-funnel">
+            <div className="text-left text-[8px] font-normal text-ink-muted md:text-[12px]">
                 {name ?? ''}
             </div>
-            <div className="gesture-allowed m-[4px] flex flex-col bg-[#FFFFFF]">
-                <div className="flex size-full items-center justify-start gap-[15px] bg-[#FFFFFF]">
-                    {/* backgroundSize is driven from the store and paints the
-                        filled portion of the track, so it stays inline. */}
-                    <input
-                        onChange={handleValueChange}
-                        type="range"
-                        name="range"
-                        id="range-slider"
-                        step={step}
-                        value={value}
-                        min={min}
-                        max={max}
-                        className="h-[5px] w-full cursor-pointer appearance-none rounded-[50px] bg-[#A7A7A7] bg-[linear-gradient(#5CA367,#5CA367)] bg-no-repeat [&::-moz-range-thumb]:h-[15px] [&::-moz-range-thumb]:w-[15px] [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#D5D4D8] [&::-webkit-slider-thumb]:h-[15px] [&::-webkit-slider-thumb]:w-[15px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2C2C2C]"
-                        style={{ backgroundSize }}
-                    />
-                </div>
+
+            {track}
+
+            {/* `tabular-nums` keeps every digit the same width, so the box
+                does not twitch as the value changes while dragging. */}
+            <div className="w-[72px] rounded-[8px] border-[1px] border-line/25 bg-surface-2 px-[8px] py-[6px] text-center text-[8px] font-semibold text-ink tabular-nums md:text-[12px]">
+                {format(value, step)}
             </div>
-            <div className="m-[4px]">
-                <div className="mt-[16px]">
-                    <input
-                        type="number"
-                        className="block w-[72px] [appearance:textfield] rounded-[4px] border border-[#E5E7EB] px-[12px] py-[8px] font-funnel text-[8px] font-semibold text-[#000000] focus:outline-0 md:text-[12px] [&::-webkit-inner-spin-button]:m-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-outer-spin-button]:appearance-none"
-                        value={value}
-                        disabled={true}
-                        readOnly
-                    />
-                </div>
-            </div>
-        </>
+        </div>
     )
 }
 

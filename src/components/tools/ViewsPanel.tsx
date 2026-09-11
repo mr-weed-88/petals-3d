@@ -3,7 +3,7 @@ import { useCallback, useEffect } from 'react'
 import {
     IconArrowBackUp,
     IconArrowForwardUp,
-    IconGridDots,
+    IconGrid4x4,
     IconLock,
     IconMaximize,
     IconPerspective,
@@ -15,6 +15,7 @@ import { canvasViewStore } from '../../hooks/useCanvasViewStore'
 
 import RangeSlider from '../RangeSlider'
 import ToolTip from '../ToolTip'
+import Divider from '../Divider'
 
 type ViewAction = 'fov_slider' | 'grids'
 
@@ -43,9 +44,6 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
 
         cameraFov,
         setCameraFov,
-
-        fovBackground,
-        setFovBackground,
 
         isOrthographic,
         setIsOrthographic,
@@ -112,18 +110,18 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
 
     return (
         <>
-            <div className="absolute bottom-[16px] left-[12px] flex flex-col gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl">
+            <div className="absolute bottom-[16px] left-[12px] flex flex-col gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px] text-ink drop-shadow-xl">
                 <ToolTip text="Full screen" position="right" delay={100}>
                     <button
                         onClick={() => void handleFullscreenToggle()}
-                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
+                        className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             fullScreen
-                                ? 'bg-[#5CA367]'
-                                : 'hover:bg-[#5CA367]/75'
+                                ? 'bg-accent text-accent-ink'
+                                : 'hover:bg-accent/25'
                         }`}
                     >
                         <IconMaximize
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                             stroke={1}
                         />
@@ -133,14 +131,14 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                 <ToolTip text="Perfect View" position="right" delay={100}>
                     <button
                         onClick={() => setIsOrthographic(!isOrthographic)}
-                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
+                        className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             isOrthographic
-                                ? 'bg-[#5CA367]'
-                                : 'hover:bg-[#5CA367]/75'
+                                ? 'bg-accent text-accent-ink'
+                                : 'hover:bg-accent/25'
                         }`}
                     >
                         <OrthograhicView
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                         />
                     </button>
@@ -150,31 +148,33 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                     <button
                         disabled={isOrthographic}
                         onClick={() => handleViewActions('fov_slider')}
-                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
+                        className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             showFovSlider && !isOrthographic
-                                ? 'bg-[#5CA367]'
-                                : 'hover:bg-[#5CA367]/75'
+                                ? 'bg-accent text-accent-ink'
+                                : 'hover:bg-accent/25'
                         }`}
                     >
                         <IconPerspective
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                             stroke={1}
                         />
                     </button>
                 </ToolTip>
 
+                <Divider orientation="horizontal" />
+
                 <ToolTip text="Enable Grids" position="right" delay={100}>
                     <button
                         onClick={() => handleViewActions('grids')}
-                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
+                        className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             showGridOptions
-                                ? 'bg-[#5CA367]'
-                                : 'hover:bg-[#5CA367]/75'
+                                ? 'bg-accent text-accent-ink'
+                                : 'hover:bg-accent/25'
                         }`}
                     >
-                        <IconGridDots
-                            color="#000000"
+                        <IconGrid4x4
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                             stroke={1}
                         />
@@ -184,29 +184,31 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                 <ToolTip text="Orbit Lock" position="right" delay={100}>
                     <button
                         onClick={() => setOrbitalLock(!orbitalLock)}
-                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
+                        className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             orbitalLock
-                                ? 'bg-[#5CA367]'
-                                : 'hover:bg-[#5CA367]/75'
+                                ? 'bg-accent text-accent-ink'
+                                : 'hover:bg-accent/25'
                         }`}
                     >
                         <IconLock
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                             stroke={1}
                         />
                     </button>
                 </ToolTip>
 
+                <Divider orientation="horizontal" />
+
                 {/* Undo and redo have no handler yet. Building them needs the
                     mesh-to-store aliasing resolved first: see ARCHITECTURE.md
                     section 6. */}
                 <ToolTip text="Undo" position="right" delay={100}>
                     <button
-                        className={`z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] hover:bg-[#5CA367]/75`}
+                        className={`z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25`}
                     >
                         <IconArrowBackUp
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                             stroke={1}
                         />
@@ -215,10 +217,10 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
 
                 <ToolTip text="Redo" position="right" delay={100}>
                     <button
-                        className={`z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] hover:bg-[#5CA367]/75`}
+                        className={`z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25`}
                     >
                         <IconArrowForwardUp
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 12 : 20}
                             stroke={1}
                         />
@@ -227,31 +229,27 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
             </div>
 
             {showFovSlider && !isOrthographic && (
-                <div className="absolute bottom-[140px] left-[58px] z-5 w-[140px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:bottom-[184px] md:left-[72px] md:w-[198px]">
+                <div className="absolute bottom-[140px] left-[58px] z-5 w-[140px] rounded-[12px] border-[1px] border-line/25 bg-surface text-ink drop-shadow-xl md:bottom-[184px] md:left-[72px] md:w-[198px]">
                     <RangeSlider
                         name="Camera Fov"
                         max={100}
                         min={0}
                         step={1}
                         value={cameraFov}
-                        backgroundSize={fovBackground}
                         setUpdatingValue={setCameraFov}
-                        setUpdatingBackground={setFovBackground}
                     />
                 </div>
             )}
 
             {showGridOptions && (
-                <div className="absolute bottom-[208px] left-[58px] z-5 flex justify-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:bottom-[256px] md:left-[72px]">
+                <div className="absolute bottom-[208px] left-[58px] z-5 flex justify-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px] text-ink drop-shadow-xl md:bottom-[256px] md:left-[72px]">
                     <button
                         onClick={() => setGridPlaneX(!gridPlaneX)}
                         className={`${
-                            gridPlaneX
-                                ? 'bg-[#DE3163]/50'
-                                : 'hover:bg-[#5CA367]/75'
-                        } z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF]`}
+                            gridPlaneX ? 'bg-axis-x/50' : 'hover:bg-accent/25'
+                        } z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
-                        <IconGridDots
+                        <IconGrid4x4
                             color="#DE3163"
                             size={isSmall ? 12 : 20}
                             stroke={1}
@@ -261,12 +259,10 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                     <button
                         onClick={() => setGridPlaneY(!gridPlaneY)}
                         className={`${
-                            gridPlaneY
-                                ? 'bg-[#50C878]/50'
-                                : 'hover:bg-[#5CA367]/75'
-                        } z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF]`}
+                            gridPlaneY ? 'bg-axis-y/50' : 'hover:bg-accent/25'
+                        } z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
-                        <IconGridDots
+                        <IconGrid4x4
                             color="#50C878"
                             size={isSmall ? 12 : 20}
                             stroke={1}
@@ -276,12 +272,10 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                     <button
                         onClick={() => setGridPlaneZ(!gridPlaneZ)}
                         className={`${
-                            gridPlaneZ
-                                ? 'bg-[#0096FF]/50'
-                                : 'hover:bg-[#5CA367]/75'
-                        } z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF]`}
+                            gridPlaneZ ? 'bg-axis-z/50' : 'hover:bg-accent/25'
+                        } z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
-                        <IconGridDots
+                        <IconGrid4x4
                             color="#0096FF"
                             size={isSmall ? 12 : 20}
                             stroke={1}

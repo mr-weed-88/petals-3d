@@ -11,12 +11,6 @@ import type {
     AxisMode,
 } from '../types/domain'
 
-/**
- * A CSS `background-size` string such as `"30% 100%"`, used to paint the
- * filled portion of a range input's track.
- */
-type SliderFill = `${number}% 100%` | string
-
 export interface CanvasDrawState {
     /** Input device the editor is bound to. Every pointer handler gates on it. */
     pointerType: PointerType
@@ -147,29 +141,6 @@ export interface CanvasDrawState {
 
     drawGuideShapeOptions: boolean
     setDrawGuideShapeOptions: (bool: boolean) => void
-
-    /* Slider track fills ------------------------------------------ */
-
-    widthBackground: SliderFill
-    setWidthBackground: (value: SliderFill) => void
-
-    stableBackground: SliderFill
-    setStableBackground: (value: SliderFill) => void
-
-    opacityBackground: SliderFill
-    setOpacityBackground: (value: SliderFill) => void
-
-    tensionBackground: SliderFill
-    setTensionBackground: (value: SliderFill) => void
-
-    ployBackground: SliderFill
-    setPolyBackground: (value: SliderFill) => void
-
-    waistBackground: SliderFill
-    setWaistBackground: (value: SliderFill) => void
-
-    radialBackground: SliderFill
-    setRadialBackground: (value: SliderFill) => void
 
     /* Slider values ----------------------------------------------- */
 
@@ -302,27 +273,6 @@ export const canvasDrawStore = create<CanvasDrawState>((set) => ({
 
     drawGuideShapeOptions: false,
     setDrawGuideShapeOptions: (bool) => set({ drawGuideShapeOptions: bool }),
-
-    widthBackground: '4.8% 100%',
-    setWidthBackground: (value) => set({ widthBackground: value }),
-
-    stableBackground: '30% 100%',
-    setStableBackground: (value) => set({ stableBackground: value }),
-
-    opacityBackground: '100% 100%',
-    setOpacityBackground: (value) => set({ opacityBackground: value }),
-
-    tensionBackground: '50% 100%',
-    setTensionBackground: (value) => set({ tensionBackground: value }),
-
-    ployBackground: '1% 100%',
-    setPolyBackground: (value) => set({ ployBackground: value }),
-
-    waistBackground: '50% 100%',
-    setWaistBackground: (value) => set({ waistBackground: value }),
-
-    radialBackground: '50% 100%',
-    setRadialBackground: (value) => set({ radialBackground: value }),
 
     tensionPercentage: 50,
     setTensionPercentage: (value) => set({ tensionPercentage: value }),

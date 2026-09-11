@@ -3,6 +3,8 @@ import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
+import { themeStore } from '../../hooks/useThemeStore'
+import { SCENE } from '../../config/theme'
 
 import {
     smoothArray,
@@ -57,7 +59,9 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
     let normals: THREE.Vector3[] = []
     let currentMesh: THREE.Mesh | null = null
 
-    const color = new THREE.Color('#C0C0C0')
+    // Guide scaffolding has to read against whichever ground is behind it.
+    const { resolved } = themeStore((state) => state)
+    const color = new THREE.Color(SCENE[resolved].guide)
 
     /**
      * Extrudes the drawn curve along the plane normal into a flat ribbon.

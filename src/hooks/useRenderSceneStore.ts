@@ -14,9 +14,6 @@ export interface CanvasRenderState {
     lightIntensity: number
     setLightIntensity: (value: number) => void
 
-    intensityBackground: string
-    setIntensityBackground: (value: string) => void
-
     /** Enables the bloom pass. */
     postProcess: boolean
     setPostProcess: (bool: boolean) => void
@@ -79,9 +76,6 @@ export const canvasRenderStore = create<CanvasRenderState>((set, get) => ({
 
     lightIntensity: 0,
     setLightIntensity: (value) => set({ lightIntensity: value }),
-
-    intensityBackground: '10% 100%',
-    setIntensityBackground: (value) => set({ intensityBackground: value }),
 
     postProcess: false,
     setPostProcess: (bool) => set({ postProcess: bool }),

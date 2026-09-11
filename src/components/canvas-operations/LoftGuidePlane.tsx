@@ -17,6 +17,8 @@ import {
     type GuideSetInput,
 } from '../../helpers/loftGuideHelper'
 import { isLineMesh, type LineMesh } from '../../types/domain'
+import { themeStore } from '../../hooks/useThemeStore'
+import { SCENE } from '../../config/theme'
 
 export interface LoftGuidePlaneProps {
     /** Called with the finished surface, which becomes the drawing plane. */
@@ -40,6 +42,9 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
     } = canvasDrawStore((state) => state)
 
     const { activeGroup } = canvasRenderStore((state) => state)
+
+    const { resolved } = themeStore((state) => state)
+    const palette = SCENE[resolved]
 
     const highlighted = useRef<Set<LineMesh>>(new Set())
     const [draggingSelection, setDraggingSelection] = useState(false)
@@ -156,6 +161,7 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
                 initialRadial: radialPercentage / 100,
                 initialWaist: waistPercentage / 100,
                 initialPolyCount: polyCountPercentage / 100,
+                wireColor: palette.loftWire,
             }
         )
 
@@ -201,7 +207,7 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
                 }
 
                 const staticMaterial = new THREE.MeshBasicMaterial({
-                    color: new THREE.Color('#C0C0C0'),
+                    color: new THREE.Color(palette.guide),
                     wireframe: false,
                     transparent: true,
                     opacity: 0.25,

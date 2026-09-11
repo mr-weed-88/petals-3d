@@ -1,15 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import {
     IconBallpen,
     IconBrandGithub,
+    IconDeviceDesktop,
     IconDownload,
     IconHandFinger,
     IconMenu2,
+    IconMoon,
     IconMouse,
+    IconSun,
 } from '@tabler/icons-react'
 import { v4 as uuidv4 } from 'uuid'
-import { toast } from 'react-toastify'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 
 import Canvas3d from './Canvas3d'
@@ -17,8 +19,9 @@ import ToolPanel from '../tools/ToolPanel'
 import ViewsPanel from '../tools/ViewsPanel'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
+import { themeStore } from '../../hooks/useThemeStore'
+import { SCENE } from '../../config/theme'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
-import { canvasViewStore } from '../../hooks/useCanvasViewStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 
 import CopyGroups from '../groups/CopyGroups'
@@ -27,8 +30,12 @@ import RenameGroups from '../groups/RenameGroups'
 import DeleteGroups from '../groups/DeleteGroups'
 
 import ToolTip from '../ToolTip'
-import { Fade } from '../../config/objectsConfig'
-import { notifyError } from '../../helpers/notify'
+import {
+    dismissNotice,
+    notifyError,
+    notifyInfo,
+    POINTER_PROMPT,
+} from '../../helpers/notify'
 import { loadSceneFromIndexedDB, saveGroupToIndexDB } from '../../db/storage'
 import type { Group, PointerType } from '../../types/domain'
 
@@ -41,6 +48,13 @@ const GESTURE_EXEMPT = '.overflow-y-auto, .custom-scrollbar, .gesture-allowed'
 
 /** Keys that scroll the page, suppressed so they cannot fire mid-stroke. */
 const SCROLL_KEYS = [32, 33, 34, 35, 36, 37, 38, 39, 40]
+
+/** The three theme choices offered in the burger menu. */
+const THEME_OPTIONS = [
+    { mode: 'light' as const, label: 'Light', Icon: IconSun },
+    { mode: 'dark' as const, label: 'Dark', Icon: IconMoon },
+    { mode: 'system' as const, label: 'System', Icon: IconDeviceDesktop },
+]
 
 /** True when the event started inside a container that keeps its gestures. */
 function isExempt(target: EventTarget | null): boolean {
@@ -64,39 +78,70 @@ const Editor = () => {
 
     const hasRun = useRef(false)
 
-    const { pointerType, setPointerType, setDrawGuide } = canvasDrawStore(
-        (state) => state
-    )
+    const { pointerType, setPointerType } = canvasDrawStore((state) => state)
     const { addNewGroup, activeScene, setGroupData, setActiveGroup } =
         canvasRenderStore((state) => state)
-    const { setOrbitalLock } = canvasViewStore((state) => state)
+
+    const { mode, resolved, setMode } = themeStore((state) => state)
+    const { setCanvasBackgroundColor } = canvasRenderStore((state) => state)
+
+    /**
+     * The canvas background follows the theme, but the picker in the render
+     * panel can still override it. Writing only when the theme changes means
+     * a custom colour survives until the next theme switch.
+     */
+    useEffect(() => {
+        setCanvasBackgroundColor(SCENE[resolved].canvas)
+    }, [resolved, setCanvasBackgroundColor])
+
+    /**
+     * Records the input device and clears the prompt. The first pointer to
+     * touch the app answers it implicitly; the burger menu answers it
+     * explicitly. Either way the prompt has served its purpose.
+     *
+     * It deliberately picks no tool. Turning Draw Guide on here meant the app
+     * armed a tool the user never asked for, and locked the orbit controls
+     * with it, so the first drag drew instead of rotating the view.
+     */
+    const choosePointer = useCallback(
+        (value: PointerType) => {
+            setPointerType(value)
+            dismissNotice(POINTER_PROMPT)
+        },
+        [setPointerType]
+    )
 
     // The first pointer that touches the app decides which device the editor
     // binds to, so a resting palm cannot draw while a stylus is in use.
     useEffect(() => {
-        toast.info(`Select Pointer type first!`, {
-            position: 'top-center',
-            autoClose: false,
-            hideProgressBar: true,
-            closeOnClick: false,
-            pauseOnHover: false,
-            draggable: false,
-            progress: undefined,
-            theme: 'light',
-            transition: Fade,
-        })
+        notifyInfo(
+            <span className="flex items-center gap-[8px] font-funnel text-[12px] font-medium text-ink">
+                <IconHandFinger
+                    color="currentColor"
+                    size={16}
+                    stroke={1}
+                    className="shrink-0 text-accent"
+                />
+                Select Pointer type first!
+            </span>,
+            {
+                toastId: POINTER_PROMPT,
+                // It closes itself the moment a pointer type is chosen, so a
+                // close button would only offer a way to lose the instruction
+                // without acting on it.
+                closeButton: false,
+            }
+        )
 
         const onFirstPointerDown = (e: PointerEvent) => {
-            setPointerType(e.pointerType as PointerType)
-            setDrawGuide(true)
-            setOrbitalLock(true)
+            choosePointer(e.pointerType as PointerType)
             window.removeEventListener('pointerdown', onFirstPointerDown, true)
         }
 
         window.addEventListener('pointerdown', onFirstPointerDown, true)
         return () =>
             window.removeEventListener('pointerdown', onFirstPointerDown, true)
-    }, [setPointerType, setDrawGuide, setOrbitalLock])
+    }, [choosePointer])
 
     useEffect(() => {
         if (hasRun.current) return
@@ -319,13 +364,13 @@ const Editor = () => {
             <DisableBrowserGestures />
 
             <div className="z-5 flex h-screen w-screen overflow-hidden select-none">
-                <div className="absolute top-[12px] left-[12px] z-5 flex items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] hover:bg-[#5CA367]/75">
+                <div className="absolute top-[12px] left-[12px] z-5 flex items-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px]">
                     <button
                         onClick={() => setShowOptions(!showOptions)}
-                        className="flex justify-center rounded-[4px] p-[8px] font-bold"
+                        className="flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
                     >
                         <IconMenu2
-                            color="#000000"
+                            color="currentColor"
                             size={isSmall ? 8 : 12}
                             stroke={1}
                         />
@@ -333,11 +378,11 @@ const Editor = () => {
                 </div>
 
                 {showOptions && (
-                    <div className="absolute top-[72px] left-[12px] z-5 flex-col items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] font-funnel text-[8px] font-normal drop-shadow-xl md:text-[12px]">
+                    <div className="absolute top-[72px] left-[12px] z-5 flex-col items-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface font-funnel text-[8px] font-normal drop-shadow-xl md:text-[12px]">
                         <ul>
                             <li
                                 onClick={downloadFile}
-                                className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[4px] font-funnel text-[8px] font-normal hover:bg-[#5CA367]/25 md:text-[12px]"
+                                className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-accent/25 md:text-[12px]"
                             >
                                 {/* Was position="right-bottom", which is not
                                     one of the four supported positions, so the
@@ -347,9 +392,9 @@ const Editor = () => {
                                     position="right"
                                     delay={100}
                                 >
-                                    <button className="flex cursor-pointer items-center justify-center rounded-[4px] px-[8px] font-bold">
+                                    <button className="flex cursor-pointer items-center justify-center rounded-[8px] px-[8px] font-bold">
                                         <IconDownload
-                                            color="#000000"
+                                            color="currentColor"
                                             size={isSmall ? 12 : 16}
                                             stroke={1}
                                         />
@@ -361,7 +406,7 @@ const Editor = () => {
                                 </ToolTip>
                             </li>
 
-                            <li className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[4px] font-funnel text-[8px] font-normal hover:bg-[#5CA367]/25 md:text-[12px]">
+                            <li className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-accent/25 md:text-[12px]">
                                 {/* Was position="bottom-right". Same issue. */}
                                 <ToolTip
                                     text="GitHub"
@@ -369,14 +414,14 @@ const Editor = () => {
                                     delay={100}
                                 >
                                     <a
-                                        className="flex cursor-pointer items-center justify-center rounded-[4px] px-[8px] font-bold"
+                                        className="flex cursor-pointer items-center justify-center rounded-[8px] px-[8px] font-bold"
                                         href="https://github.com/SW881/petals-3d"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
                                         <div>
                                             <IconBrandGithub
-                                                color="#000000"
+                                                color="currentColor"
                                                 size={isSmall ? 12 : 16}
                                                 stroke={1}
                                             />
@@ -389,7 +434,7 @@ const Editor = () => {
                                 </ToolTip>
                             </li>
 
-                            <li className="flex border-b-[1px] border-[#4B5563]/25"></li>
+                            <li className="flex border-b-[1px] border-line/25"></li>
 
                             <li className="m-[4px] flex items-center justify-between gap-[12px] p-[4px]">
                                 <div>Pointer</div>
@@ -400,17 +445,15 @@ const Editor = () => {
                                         delay={100}
                                     >
                                         <button
-                                            onClick={() =>
-                                                setPointerType('pen')
-                                            }
-                                            className={`flex cursor-pointer justify-center rounded-[4px] p-[8px] font-bold ${
+                                            onClick={() => choosePointer('pen')}
+                                            className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                 pointerType === 'pen'
-                                                    ? 'bg-[#5CA367]'
-                                                    : 'hover:bg-[#5CA367]/25'
+                                                    ? 'bg-accent text-accent-ink'
+                                                    : 'hover:bg-accent/25'
                                             }`}
                                         >
                                             <IconBallpen
-                                                color="#000000"
+                                                color="currentColor"
                                                 size={isSmall ? 12 : 20}
                                                 stroke={1}
                                             />
@@ -424,16 +467,16 @@ const Editor = () => {
                                     >
                                         <button
                                             onClick={() =>
-                                                setPointerType('mouse')
+                                                choosePointer('mouse')
                                             }
-                                            className={`flex cursor-pointer justify-center rounded-[4px] p-[8px] font-bold ${
+                                            className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                 pointerType === 'mouse'
-                                                    ? 'bg-[#5CA367]'
-                                                    : 'hover:bg-[#5CA367]/25'
+                                                    ? 'bg-accent text-accent-ink'
+                                                    : 'hover:bg-accent/25'
                                             }`}
                                         >
                                             <IconMouse
-                                                color="#000000"
+                                                color="currentColor"
                                                 size={isSmall ? 12 : 20}
                                                 stroke={1}
                                             />
@@ -447,21 +490,54 @@ const Editor = () => {
                                     >
                                         <button
                                             onClick={() =>
-                                                setPointerType('touch')
+                                                choosePointer('touch')
                                             }
-                                            className={`flex cursor-pointer justify-center rounded-[4px] p-[8px] font-bold ${
+                                            className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                 pointerType === 'touch'
-                                                    ? 'bg-[#5CA367]'
-                                                    : 'hover:bg-[#5CA367]/25'
+                                                    ? 'bg-accent text-accent-ink'
+                                                    : 'hover:bg-accent/25'
                                             }`}
                                         >
                                             <IconHandFinger
-                                                color="#000000"
+                                                color="currentColor"
                                                 size={isSmall ? 12 : 20}
                                                 stroke={1}
                                             />
                                         </button>
                                     </ToolTip>
+                                </div>
+                            </li>
+
+                            <li className="flex border-b-[1px] border-line/25"></li>
+
+                            <li className="m-[4px] flex items-center justify-between gap-[12px] p-[4px]">
+                                <div>Theme</div>
+                                <div className="flex items-center justify-between gap-[4px]">
+                                    {THEME_OPTIONS.map((option) => (
+                                        <ToolTip
+                                            key={option.mode}
+                                            text={option.label}
+                                            position="bottom"
+                                            delay={100}
+                                        >
+                                            <button
+                                                onClick={() =>
+                                                    setMode(option.mode)
+                                                }
+                                                className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
+                                                    mode === option.mode
+                                                        ? 'bg-accent text-accent-ink'
+                                                        : 'hover:bg-accent/25'
+                                                }`}
+                                            >
+                                                <option.Icon
+                                                    color="currentColor"
+                                                    size={isSmall ? 12 : 20}
+                                                    stroke={1}
+                                                />
+                                            </button>
+                                        </ToolTip>
+                                    ))}
                                 </div>
                             </li>
                         </ul>
@@ -473,13 +549,17 @@ const Editor = () => {
                 {sceneOptions && copyGroupModal && <CopyGroups />}
                 {sceneOptions && deleteGroupModal && <DeleteGroups />}
 
-                <div>
+                {/* Reaching for a tool means you are done with the menu. Both
+                    panels overlap the menu's column, so leaving it open hides
+                    the options you just opened. Capture phase, so a child that
+                    stops propagation cannot leave the menu stuck open. */}
+                <div onPointerDownCapture={() => setShowOptions(false)}>
                     <ToolPanel isSmall={isSmall} />
                 </div>
                 <div className="size-full grow">
                     <Canvas3d />
                 </div>
-                <div>
+                <div onPointerDownCapture={() => setShowOptions(false)}>
                     <ViewsPanel isSmall={isSmall} />
                 </div>
             </div>
