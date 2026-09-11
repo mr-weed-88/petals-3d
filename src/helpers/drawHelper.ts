@@ -1,0 +1,814 @@
+import * as THREE from 'three'
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+
+import type {
+    DrawShapeType,
+    Group,
+    MaterialType,
+    MirrorAxis,
+    MirrorState,
+    StripId,
+    StrokeType,
+    StrokeWidth,
+} from '../types/domain'
+
+/** Materials the editor produces. All of them accept `.color` and `.opacity`. */
+export type StrokeMaterial =
+    THREE.MeshBasicMaterial | THREE.MeshStandardMaterial
+
+const MAX_POINTS = 50000
+
+/* ------------------------------------------------------------------ *
+ * Scene reconstruction
+ * ------------------------------------------------------------------ */
+
+export interface GenerateSceneResult {
+    newGeneratedGroups: Group[]
+    newScene: THREE.Scene
+}
+
+/**
+ * Rebuilds every stored stroke into scene geometry.
+ *
+ * Only the sampled input is persisted, never vertex buffers, so the whole
+ * pipeline is replayed here: smooth, thin, frame, extrude, merge.
+ */
+export const generateScene = (
+    scene: THREE.Scene,
+    gD: Group[]
+): GenerateSceneResult => {
+    const newGeneratedGroups: Group[] = []
+
+    for (const group of gD) {
+        if (group.deleted_at) continue
+
+        for (const line of group.objects) {
+            if (line.is_deleted) continue
+
+            const currentMesh: THREE.Mesh[] = []
+            const ogGeometries: THREE.BufferGeometry[] = []
+
+            for (const k of [0, 1, 2, 3] as const) {
+                // The original call passed seven arguments to this
+                // six-parameter function, shifting every value one slot
+                // left: the scene arrived as the stroke colour, a material
+                // name as the vertex budget, and the material factory
+                // returned undefined. It survived only because every
+                // corrupted value was overwritten or disposed below.
+                const mesh = createInitialLineMesh(
+                    line.color,
+                    line.opacity,
+                    line.material_type,
+                    MAX_POINTS,
+                    line.is_mirror,
+                    k
+                )
+                currentMesh.push(mesh)
+
+                updateLine(
+                    k,
+                    line.optimization_threshold,
+                    line.smooth_percentage,
+                    line.shape_type,
+                    mesh,
+                    line.width,
+                    // Was `line.stroke_opacity`, a field never written by the
+                    // save path, so the vertex colour alpha was undefined.
+                    line.opacity,
+                    line.stroke_type,
+                    line.color,
+                    line.points,
+                    line.pressures,
+                    line.normals
+                )
+
+                // Cloned because the source is disposed immediately below
+                // and the merge has to outlive it.
+                ogGeometries.push(mesh.geometry.clone())
+
+                scene.remove(mesh)
+                mesh.geometry.dispose()
+                disposeMaterial(mesh.material)
+            }
+
+            const mergedGeo = BufferGeometryUtils.mergeGeometries(
+                ogGeometries,
+                false
+            )
+            ogGeometries.forEach((g) => g.dispose())
+
+            mergedGeo.computeVertexNormals()
+            mergedGeo.computeBoundingBox()
+            mergedGeo.computeBoundingSphere()
+
+            const material = getActiveMaterial(
+                line.material_type,
+                line.opacity,
+                line.color
+            )
+            const combinedMesh = new THREE.Mesh(mergedGeo, material)
+
+            combinedMesh.scale.set(line.scale.x, line.scale.y, line.scale.z)
+            combinedMesh.position.copy(line.position)
+            combinedMesh.quaternion.copy(line.rotation)
+
+            combinedMesh.userData = line
+            scene.add(combinedMesh)
+        }
+
+        // Soft-deleted strokes are dropped now that the scene is built.
+        group.objects = group.objects.filter((line) => !line.is_deleted)
+        newGeneratedGroups.push(group)
+    }
+
+    return { newGeneratedGroups, newScene: scene }
+}
+
+function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
+    const list = Array.isArray(material) ? material : [material]
+    for (const m of list) {
+        const withMap = m as THREE.Material & { map?: THREE.Texture | null }
+        withMap.map?.dispose()
+        m.dispose()
+    }
+}
+
+/**
+ * Builds one face of a stored stroke's tube.
+ *
+ * The four faces are built as separate meshes and merged afterwards.
+ * Generating all four in one geometry produces harsh seams along the
+ * shared edges, which become obvious once opacity drops below 1.
+ */
+function updateLine(
+    stripId: StripId,
+    optimizationThreshold: number,
+    smoothPercentage: number,
+    shapeType: DrawShapeType,
+    mesh: THREE.Mesh,
+    width: number,
+    strokeOpacity: number,
+    strokeType: StrokeType,
+    strokeColor: string,
+    rawPts: THREE.Vector3[],
+    pressuresArr: number[],
+    normalsArr: THREE.Vector3[]
+): void {
+    if (rawPts.length < 2) return
+
+    const geometry = mesh.geometry
+
+    let pts = rawPts
+    let pressures = pressuresArr
+    let finalNormals = normalsArr
+
+    if (shapeType === 'free_hand') {
+        pts = smoothPoints(rawPts, smoothPercentage)
+        pressures = smoothArray(pressuresArr, smoothPercentage)
+        const filteredResult = filterPoints(
+            pts,
+            pressures,
+            normalsArr,
+            optimizationThreshold
+        )
+        pts = filteredResult.filteredPts
+        pressures = filteredResult.filteredPressures
+        finalNormals = filteredResult.filteredNormals
+    } else if (shapeType === 'straight') {
+        const filteredResult = filterPoints(
+            pts,
+            pressures,
+            normalsArr,
+            optimizationThreshold
+        )
+        pts = filteredResult.filteredPts
+        pressures = filteredResult.filteredPressures
+        finalNormals = filteredResult.filteredNormals
+    }
+
+    if (pts.length < 2) return
+
+    const positions: number[] = []
+    const meshNormals: number[] = []
+    const indices: number[] = []
+    const colors: number[] = []
+
+    const baseColor = new THREE.Color(strokeColor)
+
+    const tangents: THREE.Vector3[] = []
+    for (let i = 0; i < pts.length - 1; i++) {
+        tangents.push(
+            new THREE.Vector3().subVectors(pts[i + 1]!, pts[i]!).normalize()
+        )
+    }
+
+    if (pts.length === 2 && tangents.length === 0) {
+        tangents.push(
+            new THREE.Vector3().subVectors(pts[1]!, pts[0]!).normalize()
+        )
+    }
+
+    const firstNormal = finalNormals[0] ?? new THREE.Vector3(0, 1, 0)
+    const firstTangent = tangents[0] ?? new THREE.Vector3(1, 0, 0)
+
+    // Parallel-transport frame. Recomputing an arbitrary "up" per point
+    // makes the tube twist; rotating each frame from the previous one by
+    // the quaternion between successive tangents keeps it stable.
+    const transportedRights: THREE.Vector3[] = []
+    const right = new THREE.Vector3()
+        .crossVectors(firstNormal, firstTangent)
+        .normalize()
+
+    if (right.lengthSq() < 1e-6) {
+        right.set(0, 1, 0)
+        if (Math.abs(firstTangent.dot(right)) > 0.99) right.set(1, 0, 0)
+        right.crossVectors(firstNormal, firstTangent).normalize()
+    }
+    transportedRights.push(right.clone())
+
+    for (let i = 1; i < tangents.length; i++) {
+        const prevT = tangents[i - 1]!
+        const currT = tangents[i]!
+        const axis = new THREE.Vector3().crossVectors(prevT, currT)
+        const angle = Math.acos(THREE.MathUtils.clamp(prevT.dot(currT), -1, 1))
+
+        if (axis.lengthSq() < 1e-6 || angle === 0) {
+            transportedRights.push(transportedRights[i - 1]!.clone())
+        } else {
+            const q = new THREE.Quaternion().setFromAxisAngle(
+                axis.normalize(),
+                angle
+            )
+            transportedRights.push(
+                transportedRights[i - 1]!.clone().applyQuaternion(q).normalize()
+            )
+        }
+    }
+
+    for (let i = 0; i < pts.length; i++) {
+        const curr = pts[i]!
+        const tangent =
+            i === pts.length - 1
+                ? (tangents[i - 1] ?? firstTangent)
+                : (tangents[i] ?? firstTangent)
+        const rightVec =
+            transportedRights[i] ??
+            transportedRights[transportedRights.length - 1]!
+        const up = new THREE.Vector3()
+            .crossVectors(tangent, rightVec)
+            .normalize()
+
+        let taperFactor = 1
+
+        if (strokeType === 'taper') {
+            const t = pts.length > 1 ? i / (pts.length - 1) : 0
+            const taperAmount = 1.0
+            taperFactor = 1 - taperAmount + taperAmount * Math.sin(t * Math.PI)
+        }
+
+        const effectivePressure =
+            (pressures[i] ?? 1) * (strokeType === 'taper' ? taperFactor : 1)
+
+        const { w, h } = getAdaptiveStrokeWidth(
+            strokeType,
+            effectivePressure,
+            width
+        )
+
+        const halfW = w
+        const halfH = h
+
+        const tl = new THREE.Vector3()
+            .copy(curr)
+            .addScaledVector(rightVec, -halfW)
+            .addScaledVector(up, halfH)
+        const tr = new THREE.Vector3()
+            .copy(curr)
+            .addScaledVector(rightVec, halfW)
+            .addScaledVector(up, halfH)
+        const br = new THREE.Vector3()
+            .copy(curr)
+            .addScaledVector(rightVec, halfW)
+            .addScaledVector(up, -halfH)
+        const bl = new THREE.Vector3()
+            .copy(curr)
+            .addScaledVector(rightVec, -halfW)
+            .addScaledVector(up, -halfH)
+
+        const normal = finalNormals[i] ?? firstNormal
+        const baseIdx = positions.length / 3
+
+        for (const v of [tl, tr, br, bl, tl, tr, br, bl]) {
+            positions.push(v.x, v.y, v.z)
+            meshNormals.push(normal.x, normal.y, normal.z)
+            colors.push(baseColor.r, baseColor.g, baseColor.b, strokeOpacity)
+        }
+
+        if (i > 0) {
+            const prevBase = baseIdx - 4
+            if (stripId === 0) {
+                indices.push(prevBase, prevBase + 1, baseIdx + 1)
+                indices.push(prevBase, baseIdx + 1, baseIdx)
+            }
+            if (stripId === 1) {
+                indices.push(prevBase + 1, prevBase + 2, baseIdx + 2)
+                indices.push(prevBase + 1, baseIdx + 2, baseIdx + 1)
+            }
+            if (stripId === 2) {
+                indices.push(prevBase + 2, prevBase + 3, baseIdx + 3)
+                indices.push(prevBase + 2, baseIdx + 3, baseIdx + 2)
+            }
+            if (stripId === 3) {
+                indices.push(prevBase + 3, prevBase, baseIdx)
+                indices.push(prevBase + 3, baseIdx, baseIdx + 3)
+            }
+        }
+    }
+
+    geometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(positions, 3)
+    )
+    geometry.setAttribute(
+        'normal',
+        new THREE.Float32BufferAttribute(meshNormals, 3)
+    )
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4))
+
+    geometry.setIndex(indices)
+
+    geometry.attributes.position!.needsUpdate = true
+    geometry.attributes.normal!.needsUpdate = true
+    if (geometry.index) geometry.index.needsUpdate = true
+    geometry.setDrawRange(0, indices.length)
+}
+
+/* ------------------------------------------------------------------ *
+ * Brush profile
+ * ------------------------------------------------------------------ */
+
+/**
+ * Half-extents of the brush cross-section.
+ *
+ * Every branch is covered by the StrokeType union, so unlike the original
+ * there is no default case returning undefined dimensions.
+ */
+export const getAdaptiveStrokeWidth = (
+    strokeType: StrokeType,
+    pressure: number,
+    width: number
+): StrokeWidth => {
+    const half = (pressure * width) / 2
+
+    switch (strokeType) {
+        case 'taper':
+        case 'cube':
+            return { w: half, h: half }
+        case 'paint':
+            return { w: half, h: 0.01 }
+        case 'belt':
+            return { w: 0.01, h: half }
+    }
+}
+
+/* ------------------------------------------------------------------ *
+ * Mirroring
+ * ------------------------------------------------------------------ */
+
+export const getActiveMirrorModes = (mirror: MirrorState): MirrorAxis[] => {
+    const mirrorString: MirrorAxis[] = []
+    if (mirror.x) mirrorString.push('X')
+    if (mirror.y) mirrorString.push('Y')
+    if (mirror.z) mirrorString.push('Z')
+    return mirrorString
+}
+
+export interface MirroredSample {
+    mirroredPoint: THREE.Vector3
+    mirroredNormal: THREE.Vector3
+}
+
+/**
+ * Reflects a sample across one axis of the guide plane's local space.
+ *
+ * The plane's world matrix is cached for the duration of a stroke, so the
+ * mirror stays fixed even if the plane moves mid-stroke.
+ */
+export const getMirroredPoint = (
+    cachedWorldMatrixInverseRef: { current: THREE.Matrix4 | null },
+    cachedWorldMatrixRef: { current: THREE.Matrix4 | null },
+    point: THREE.Vector3,
+    normal: THREE.Vector3,
+    mirrorAxis: MirrorAxis,
+    planeMesh: THREE.Mesh
+): MirroredSample => {
+    if (!cachedWorldMatrixRef.current || !cachedWorldMatrixInverseRef.current) {
+        cachedWorldMatrixRef.current = planeMesh.matrixWorld.clone()
+        cachedWorldMatrixInverseRef.current = new THREE.Matrix4()
+            .copy(planeMesh.matrixWorld)
+            .invert()
+    }
+
+    const worldMatrix = cachedWorldMatrixRef.current
+    const worldMatrixInverse = cachedWorldMatrixInverseRef.current
+
+    const localPoint = point.clone().applyMatrix4(worldMatrixInverse)
+    const localNormal = normal
+        .clone()
+        .transformDirection(worldMatrixInverse)
+        .normalize()
+
+    const mirroredLocalPoint = localPoint.clone()
+    const mirroredLocalNormal = localNormal.clone()
+
+    if (mirrorAxis === 'X') {
+        mirroredLocalPoint.x *= -1
+        mirroredLocalNormal.x *= -1
+    } else if (mirrorAxis === 'Y') {
+        mirroredLocalPoint.y *= -1
+        mirroredLocalNormal.y *= -1
+    } else {
+        mirroredLocalPoint.z *= -1
+        mirroredLocalNormal.z *= -1
+    }
+
+    return {
+        mirroredPoint: mirroredLocalPoint.applyMatrix4(worldMatrix),
+        mirroredNormal: mirroredLocalNormal
+            .transformDirection(worldMatrix)
+            .normalize(),
+    }
+}
+
+/* ------------------------------------------------------------------ *
+ * Primitive shapes
+ * ------------------------------------------------------------------ */
+
+export interface CirclePoints {
+    circlePoints: THREE.Vector3[]
+    circleNormals: THREE.Vector3[]
+}
+
+export const generateCirclePointsWorld = (
+    center: THREE.Vector3,
+    normal: THREE.Vector3,
+    radius: number,
+    segments = 64
+): CirclePoints => {
+    const circlePoints: THREE.Vector3[] = []
+    const circleNormals: THREE.Vector3[] = []
+
+    const globalUp = new THREE.Vector3(0, 1, 0)
+    const globalRight = new THREE.Vector3(1, 0, 0)
+
+    const startDirection = new THREE.Vector3()
+
+    if (Math.abs(normal.dot(globalUp)) < 0.99) {
+        startDirection
+            .copy(globalUp)
+            .addScaledVector(normal, -globalUp.dot(normal))
+            .normalize()
+    } else {
+        startDirection
+            .copy(globalRight)
+            .addScaledVector(normal, -globalRight.dot(normal))
+            .normalize()
+    }
+
+    const perpDirection = new THREE.Vector3()
+        .crossVectors(normal, startDirection)
+        .normalize()
+
+    for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2
+
+        circlePoints.push(
+            new THREE.Vector3()
+                .copy(center)
+                .addScaledVector(startDirection, radius * Math.cos(angle))
+                .addScaledVector(perpDirection, radius * Math.sin(angle))
+        )
+        circleNormals.push(normal.clone())
+    }
+
+    return { circlePoints, circleNormals }
+}
+
+export interface ArcPoints {
+    arcPoints: THREE.Vector3[]
+    arcNormals: THREE.Vector3[]
+}
+
+export const generateSemiCircleOpenArcWorld = (
+    center: THREE.Vector3,
+    normal: THREE.Vector3,
+    radius: number,
+    segments = 64
+): ArcPoints => {
+    const arcPoints: THREE.Vector3[] = []
+    const arcNormals: THREE.Vector3[] = []
+
+    const tempVector = new THREE.Vector3()
+    const tempQuaternion = new THREE.Quaternion()
+
+    const zAxis = new THREE.Vector3(0, 0, 1)
+    tempQuaternion.setFromUnitVectors(zAxis, normal)
+
+    for (let i = 0; i <= segments; i++) {
+        const angle = Math.PI + (i / segments) * Math.PI
+        tempVector.set(radius * Math.cos(angle), radius * Math.sin(angle), 0)
+        tempVector.applyQuaternion(tempQuaternion).add(center)
+        arcPoints.push(tempVector.clone())
+        arcNormals.push(normal.clone())
+    }
+
+    return { arcPoints, arcNormals }
+}
+
+/* ------------------------------------------------------------------ *
+ * Smoothing, thinning, tension
+ * ------------------------------------------------------------------ */
+
+/** Lerps interior points toward the straight line between the endpoints. */
+export const applyTensionToPoints = (
+    points: THREE.Vector3[],
+    tensionValue: number
+): THREE.Vector3[] => {
+    if (points.length < 2) return points
+
+    const tensionedPoints: THREE.Vector3[] = []
+    const start = points[0]!
+    const end = points[points.length - 1]!
+
+    tensionedPoints.push(start.clone())
+
+    for (let i = 1; i < points.length - 1; i++) {
+        const t = i / (points.length - 1)
+        const straightPoint = new THREE.Vector3().lerpVectors(start, end, t)
+        tensionedPoints.push(
+            new THREE.Vector3().lerpVectors(
+                points[i]!,
+                straightPoint,
+                tensionValue
+            )
+        )
+    }
+
+    tensionedPoints.push(end.clone())
+
+    return tensionedPoints
+}
+
+const MAX_SMOOTH_WINDOW = 10
+
+function smoothWindow(length: number, percentage: number): number {
+    if (!Number.isFinite(percentage)) return 1
+    const windowSize = Math.ceil((percentage / 100) * MAX_SMOOTH_WINDOW)
+    return Math.max(1, Math.min(windowSize, Math.floor((length - 1) / 2)))
+}
+
+/** Moving-average over the points. The jitter reduction behind Stable Stroke. */
+export const smoothPoints = (
+    points: THREE.Vector3[],
+    percentage: number
+): THREE.Vector3[] => {
+    if (percentage === 0 || points.length < 3) return points
+
+    const actualWindowSize = smoothWindow(points.length, percentage)
+
+    const smoothed: THREE.Vector3[] = []
+    for (let i = 0; i < points.length; i++) {
+        const sum = new THREE.Vector3()
+        let count = 0
+
+        for (let j = -actualWindowSize; j <= actualWindowSize; j++) {
+            const point = points[i + j]
+            if (point) {
+                sum.add(point)
+                count++
+            }
+        }
+
+        // `count` is at least 1 because j = 0 always lands in range.
+        smoothed.push(sum.divideScalar(count))
+    }
+
+    return smoothed
+}
+
+export const smoothArray = (arr: number[], percentage: number): number[] => {
+    if (percentage === 0 || arr.length < 3) return arr
+
+    const actualWindowSize = smoothWindow(arr.length, percentage)
+    const smoothed: number[] = []
+
+    for (let i = 0; i < arr.length; i++) {
+        let sum = 0
+        let count = 0
+
+        for (let j = -actualWindowSize; j <= actualWindowSize; j++) {
+            const value = arr[i + j]
+            if (value !== undefined) {
+                sum += value
+                count++
+            }
+        }
+
+        smoothed.push(sum / count)
+    }
+
+    return smoothed
+}
+
+export interface FilteredStroke {
+    filteredPts: THREE.Vector3[]
+    filteredPressures: number[]
+    filteredNormals: THREE.Vector3[]
+}
+
+/**
+ * Drops samples closer together than `tolerance`, so a slow hand does not
+ * generate thousands of redundant vertices. First and last are always kept.
+ *
+ * The original guarded this with a malformed ternary whose `pts.length === 3`
+ * branch evaluated to a freshly constructed Vector3, which is always truthy,
+ * so at exactly three points no thinning happened at all.
+ */
+export const filterPoints = (
+    pts: THREE.Vector3[],
+    pressures: number[],
+    normals: THREE.Vector3[],
+    tolerance: number
+): FilteredStroke => {
+    if (pts.length < 2) {
+        return {
+            filteredPts: pts,
+            filteredPressures: pressures,
+            filteredNormals: normals,
+        }
+    }
+
+    const fallbackNormal = new THREE.Vector3(0, 1, 0)
+
+    const filteredPts: THREE.Vector3[] = [pts[0]!]
+    const filteredPressures: number[] = [pressures[0] ?? 1]
+    const filteredNormals: THREE.Vector3[] = [normals[0] ?? fallbackNormal]
+
+    let lastKeptIndex = 0
+
+    for (let i = 1; i < pts.length; i++) {
+        if (pts[i]!.distanceTo(pts[lastKeptIndex]!) >= tolerance) {
+            filteredPts.push(pts[i]!)
+            filteredPressures.push(pressures[i] ?? 1)
+            filteredNormals.push(normals[i] ?? fallbackNormal)
+            lastKeptIndex = i
+        }
+    }
+
+    if (lastKeptIndex !== pts.length - 1) {
+        filteredPts.push(pts[pts.length - 1]!)
+        filteredPressures.push(pressures[pressures.length - 1] ?? 1)
+        filteredNormals.push(normals[normals.length - 1] ?? fallbackNormal)
+    }
+
+    return { filteredPts, filteredPressures, filteredNormals }
+}
+
+/* ------------------------------------------------------------------ *
+ * Mesh and material construction
+ * ------------------------------------------------------------------ */
+
+/**
+ * An empty mesh sized for the worst case, filled in by `updateLine`.
+ *
+ * Mirror copies hide every strip but the first, so the mirrored stroke
+ * reads as a single surface while it is being drawn.
+ */
+export function createInitialLineMesh(
+    strokeColor: string,
+    strokeOpacity: number,
+    activeMaterialType: MaterialType,
+    maxPoints: number,
+    mirror: boolean,
+    stripId: StripId
+): THREE.Mesh {
+    const maxVertices = maxPoints * 4
+
+    const positions = new Float32Array(maxVertices * 3)
+    const meshNormals = new Float32Array(maxVertices * 3)
+    const indices = new Uint32Array(maxPoints * 24)
+
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    geometry.setAttribute('normal', new THREE.BufferAttribute(meshNormals, 3))
+    geometry.setIndex(new THREE.BufferAttribute(indices, 1))
+    geometry.setDrawRange(0, 0)
+
+    const material = getActiveMaterial(
+        activeMaterialType,
+        strokeOpacity,
+        strokeColor
+    )
+
+    const mesh = new THREE.Mesh(geometry, material)
+    if (mirror && stripId !== 0) {
+        mesh.visible = false
+    }
+
+    return mesh
+}
+
+export interface SnappedLine {
+    snappedEnd: THREE.Vector3
+}
+
+/** Snaps a drag to the nearest `snapAngle` increment within the plane. */
+export function getSnappedLinePointsInPlane({
+    startPoint,
+    currentPoint,
+    normal,
+    camera,
+    snapAngle = 45,
+}: {
+    startPoint: THREE.Vector3
+    currentPoint: THREE.Vector3
+    normal: THREE.Vector3
+    camera: THREE.Camera
+    snapAngle?: number
+    /** Accepted for call-site compatibility; the original never used it. */
+    pointDensity?: number
+}): SnappedLine {
+    const delta = new THREE.Vector3().subVectors(currentPoint, startPoint)
+    const length = delta.length()
+
+    const planeZ = normal.clone()
+
+    const tempX = new THREE.Vector3().crossVectors(planeZ, camera.up)
+    // Looking straight down the plane normal leaves no in-plane X axis.
+    if (tempX.lengthSq() < 0.0001) {
+        tempX
+            .set(1, 0, 0)
+            .applyQuaternion(
+                new THREE.Quaternion().setFromUnitVectors(
+                    new THREE.Vector3(0, 0, 1),
+                    planeZ
+                )
+            )
+            .normalize()
+    }
+    const planeX = tempX.normalize()
+    const planeY = new THREE.Vector3().crossVectors(planeX, planeZ).normalize()
+
+    const localDeltaX = delta.dot(planeX)
+    const localDeltaY = delta.dot(planeY)
+
+    const angleDeg = THREE.MathUtils.radToDeg(
+        Math.atan2(localDeltaY, localDeltaX)
+    )
+    const snappedDeg = Math.round(angleDeg / snapAngle) * snapAngle
+    const snappedRad = THREE.MathUtils.degToRad(snappedDeg)
+
+    const snappedDirection = new THREE.Vector3()
+        .addScaledVector(planeX, Math.cos(snappedRad))
+        .addScaledVector(planeY, Math.sin(snappedRad))
+        .normalize()
+
+    return {
+        snappedEnd: startPoint
+            .clone()
+            .addScaledVector(snappedDirection, length),
+    }
+}
+
+export function getActiveMaterial(
+    activeMaterialType: MaterialType,
+    strokeOpacity: number,
+    strokeColor: string
+): StrokeMaterial {
+    const baseColor = new THREE.Color(strokeColor)
+
+    const common = {
+        color: baseColor,
+        wireframe: false,
+        transparent: strokeOpacity < 1,
+        side: THREE.DoubleSide,
+        forceSinglePass: true,
+        depthTest: true,
+        depthWrite: true,
+        opacity: strokeOpacity,
+        blending: THREE.NormalBlending,
+    } as const
+
+    switch (activeMaterialType) {
+        case 'flat':
+            return new THREE.MeshBasicMaterial(common)
+        case 'shaded':
+            return new THREE.MeshStandardMaterial(common)
+        case 'glow':
+            return new THREE.MeshStandardMaterial({
+                ...common,
+                emissive: new THREE.Color(strokeColor),
+                emissiveIntensity: 1,
+            })
+    }
+}

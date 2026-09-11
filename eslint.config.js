@@ -1,13 +1,15 @@
 import js from '@eslint/js'
 import globals from 'globals'
+import tseslint from 'typescript-eslint'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import betterTailwindcss from 'eslint-plugin-better-tailwindcss'
 
-export default [
+export default tseslint.config(
     { ignores: ['dist'] },
     {
-        files: ['**/*.{js,jsx}'],
+        files: ['**/*.{ts,tsx}'],
+        extends: [js.configs.recommended, ...tseslint.configs.recommended],
         languageOptions: {
             ecmaVersion: 2020,
             globals: globals.browser,
@@ -30,16 +32,22 @@ export default [
             },
         },
         rules: {
-            ...js.configs.recommended.rules,
             ...reactHooks.configs.recommended.rules,
 
-            // Unused *arguments* are not reported: the codebase passes `(e)` to
-            // hundreds of click handlers that ignore it. Counting those as
-            // errors buried the genuine undefined references underneath them.
-            'no-unused-vars': [
+            // TypeScript reports unused values with better scoping.
+            'no-unused-vars': 'off',
+            '@typescript-eslint/no-unused-vars': [
                 'error',
                 { args: 'none', varsIgnorePattern: '^[A-Z_]' },
             ],
+
+            // The migration introduced no `any`. Keep it that way.
+            '@typescript-eslint/no-explicit-any': 'error',
+
+            // Non-null assertions mark places where the code already assumed a
+            // value was present. They are deliberate and greppable, so they
+            // warn rather than error until each is replaced by a real guard.
+            '@typescript-eslint/no-non-null-assertion': 'warn',
 
             'react-refresh/only-export-components': [
                 'warn',
@@ -48,7 +56,7 @@ export default [
 
             // eslint-plugin-react-hooks v7 turns these on as errors. Each one
             // flags a genuine structural problem in the canvas layer, not a
-            // style nit — components declared inside other components, and
+            // style nit - components declared inside other components, and
             // drawing state held in mutable component-body variables. They are
             // described in ARCHITECTURE.md section 10 and need refactors, not
             // one-line fixes. Kept as warnings so they stay visible without
@@ -56,9 +64,6 @@ export default [
             'react-hooks/immutability': 'warn',
             'react-hooks/static-components': 'warn',
             'react-hooks/set-state-in-effect': 'warn',
-
-            // Same reasoning: the guide planes keep in-progress stroke state in
-            // plain `let` bindings that a re-render resets.
             'no-useless-assignment': 'warn',
 
             // Tailwind correctness. Class *ordering* is deliberately left to
@@ -66,7 +71,7 @@ export default [
             'better-tailwindcss/no-unknown-classes': [
                 'error',
                 {
-                    // Marker classes with no styles of their own: `Editor.jsx`
+                    // Marker classes with no styles of their own: Editor.tsx
                     // finds them with `closest()` to decide which containers
                     // keep native scrolling and browser gestures.
                     ignore: ['custom-scrollbar', 'gesture-allowed'],
@@ -78,5 +83,5 @@ export default [
             'better-tailwindcss/no-unnecessary-whitespace': 'warn',
             'better-tailwindcss/enforce-shorthand-classes': 'warn',
         },
-    },
-]
+    }
+)

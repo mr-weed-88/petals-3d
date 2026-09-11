@@ -1,0 +1,561 @@
+import { useRef, useCallback } from 'react'
+import { useThree, useFrame } from '@react-three/fiber'
+import * as THREE from 'three'
+
+import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
+
+import {
+    smoothArray,
+    filterPoints,
+    smoothPoints,
+    generateCirclePointsWorld,
+    getSnappedLinePointsInPlane,
+    generateSemiCircleOpenArcWorld,
+} from '../../helpers/drawHelper'
+
+import { bendOGGuide } from '../../helpers/bendGuideHelper'
+import type { StrokeSample } from '../../types/domain'
+
+export interface DynamicBendGuidePlaneProps {
+    /** Called with the swept surface, which becomes the drawing plane. */
+    onDrawingFinished: (mesh: THREE.Mesh) => void
+}
+
+/**
+ * Bend mode. The profile the user drew first is kept in the store as
+ * `ogGuidePoints`; the curve drawn here is the rail it gets swept along.
+ */
+const DynamicBendGuidePlane = ({
+    onDrawingFinished,
+}: DynamicBendGuidePlaneProps) => {
+    const { camera, scene, gl } = useThree()
+    const planeRef = useRef<THREE.Mesh>(null)
+
+    const {
+        drawGuide,
+        drawShapeType,
+        strokeOpacity,
+        ogGuidePoints,
+        ogGuideNormals,
+        bendPlaneGuide,
+        pointerType,
+    } = canvasDrawStore((state) => state)
+
+    const MAX_POINTS = 50000
+    const SMOOTH_PERCENTAGE = 75
+    const DISTANCE_THRESHOLD = 0.01
+    const OPTIMIZATION_THRESHOLD = 0.01
+
+    // Plain bindings rather than refs, so a re-render mid-stroke resets them.
+    // Preserved as-is; see ARCHITECTURE.md section 10.
+    let startPoint: THREE.Vector3 | null = null
+    let currentNormal: THREE.Vector3 | null = null
+    let isDrawing = false
+    let points: THREE.Vector3[] = []
+    let pressures: number[] = []
+    let normals: THREE.Vector3[] = []
+    let currentMesh: THREE.Mesh | null = null
+
+    const color = new THREE.Color('#C0C0C0')
+
+    const BEND_OPTIONS = {
+        minPathSamples: 16,
+        maxPathSamples: 128,
+        minProfileSegments: 8,
+        maxProfileSegments: 32,
+    } as const
+
+    function createInitialLineMesh(): THREE.Mesh {
+        const maxVertices = MAX_POINTS * 4
+
+        const geometry = new THREE.BufferGeometry()
+        geometry.setAttribute(
+            'position',
+            new THREE.BufferAttribute(new Float32Array(maxVertices * 3), 3)
+        )
+        geometry.setAttribute(
+            'normal',
+            new THREE.BufferAttribute(new Float32Array(maxVertices * 3), 3)
+        )
+        geometry.setIndex(
+            new THREE.BufferAttribute(new Uint32Array(MAX_POINTS * 24), 1)
+        )
+        geometry.setDrawRange(0, 0)
+
+        const material = new THREE.MeshBasicMaterial({
+            color: new THREE.Color(color),
+            wireframe: false,
+            transparent: true,
+            opacity: 1,
+            side: THREE.DoubleSide,
+            forceSinglePass: true,
+            depthTest: true,
+            depthWrite: true,
+        })
+
+        const mesh = new THREE.Mesh(geometry, material)
+        mesh.userData.type = 'DYNAMIC_GUIDE_LINE'
+        scene.add(mesh)
+        return mesh
+    }
+
+    /** Draws the thin preview tube that follows the pointer. */
+    function updateLine(
+        mesh: THREE.Mesh,
+        rawPts: THREE.Vector3[],
+        pressuresArr: number[],
+        normalsArr: THREE.Vector3[]
+    ): void {
+        if (rawPts.length < 2) return
+
+        const geometry = mesh.geometry
+
+        let pts = rawPts
+        let finalNormals = normalsArr
+
+        if (drawShapeType === 'free_hand') {
+            pts = smoothPoints(rawPts, SMOOTH_PERCENTAGE)
+            const smoothedPressures = smoothArray(
+                pressuresArr,
+                SMOOTH_PERCENTAGE
+            )
+            const filteredResult = filterPoints(
+                pts,
+                smoothedPressures,
+                normalsArr,
+                OPTIMIZATION_THRESHOLD
+            )
+            pts = filteredResult.filteredPts
+            finalNormals = filteredResult.filteredNormals
+        }
+
+        if (pts.length < 2) return
+
+        const positions: number[] = []
+        const meshNormals: number[] = []
+        const indices: number[] = []
+
+        const tangents: THREE.Vector3[] = []
+        for (let i = 0; i < pts.length - 1; i++) {
+            tangents.push(
+                new THREE.Vector3().subVectors(pts[i + 1]!, pts[i]!).normalize()
+            )
+        }
+
+        if (tangents.length === 0) {
+            tangents.push(new THREE.Vector3(1, 0, 0))
+        }
+
+        const fallbackNormal = new THREE.Vector3(0, 1, 0)
+        const firstNormal = finalNormals[0] ?? fallbackNormal
+        const firstTangent = tangents[0]!
+
+        const transportedRights: THREE.Vector3[] = []
+        const right = new THREE.Vector3()
+            .crossVectors(firstNormal, firstTangent)
+            .normalize()
+
+        if (right.lengthSq() < 1e-6) {
+            right.set(0, 1, 0)
+            if (Math.abs(firstTangent.dot(right)) > 0.99) right.set(1, 0, 0)
+            right.crossVectors(firstNormal, firstTangent).normalize()
+        }
+        transportedRights.push(right.clone())
+
+        for (let i = 1; i < tangents.length; i++) {
+            const prevT = tangents[i - 1]!
+            const currT = tangents[i]!
+            const axis = new THREE.Vector3().crossVectors(prevT, currT)
+            const angle = Math.acos(
+                THREE.MathUtils.clamp(prevT.dot(currT), -1, 1)
+            )
+
+            if (axis.lengthSq() < 1e-6 || angle === 0) {
+                transportedRights.push(transportedRights[i - 1]!.clone())
+            } else {
+                const q = new THREE.Quaternion().setFromAxisAngle(
+                    axis.normalize(),
+                    angle
+                )
+                transportedRights.push(
+                    transportedRights[i - 1]!.clone()
+                        .applyQuaternion(q)
+                        .normalize()
+                )
+            }
+        }
+
+        for (let i = 0; i < pts.length; i++) {
+            const curr = pts[i]!
+            const tangent =
+                i === pts.length - 1
+                    ? (tangents[i - 1] ?? firstTangent)
+                    : (tangents[i] ?? firstTangent)
+            const rightVec =
+                transportedRights[i] ??
+                transportedRights[transportedRights.length - 1]!
+            const up = new THREE.Vector3()
+                .crossVectors(tangent, rightVec)
+                .normalize()
+
+            const halfW = 0.025
+            const halfH = 0.025
+
+            const tl = new THREE.Vector3()
+                .copy(curr)
+                .addScaledVector(rightVec, -halfW)
+                .addScaledVector(up, halfH)
+            const tr = new THREE.Vector3()
+                .copy(curr)
+                .addScaledVector(rightVec, halfW)
+                .addScaledVector(up, halfH)
+            const br = new THREE.Vector3()
+                .copy(curr)
+                .addScaledVector(rightVec, halfW)
+                .addScaledVector(up, -halfH)
+            const bl = new THREE.Vector3()
+                .copy(curr)
+                .addScaledVector(rightVec, -halfW)
+                .addScaledVector(up, -halfH)
+
+            const normal = (finalNormals[i] ?? firstNormal).clone()
+            const baseIdx = positions.length / 3
+
+            for (const v of [tl, tr, br, bl]) {
+                positions.push(v.x, v.y, v.z)
+                meshNormals.push(normal.x, normal.y, normal.z)
+            }
+
+            if (i > 0) {
+                const prevBase = baseIdx - 4
+                indices.push(prevBase, prevBase + 1, baseIdx + 1)
+                indices.push(prevBase, baseIdx + 1, baseIdx)
+                indices.push(prevBase + 1, prevBase + 2, baseIdx + 2)
+                indices.push(prevBase + 1, baseIdx + 2, baseIdx + 1)
+                indices.push(prevBase + 2, prevBase + 3, baseIdx + 3)
+                indices.push(prevBase + 2, baseIdx + 3, baseIdx + 2)
+                indices.push(prevBase + 3, prevBase, baseIdx)
+                indices.push(prevBase + 3, baseIdx, baseIdx + 3)
+            }
+        }
+
+        geometry.setAttribute(
+            'position',
+            new THREE.Float32BufferAttribute(positions, 3)
+        )
+        geometry.setAttribute(
+            'normal',
+            new THREE.Float32BufferAttribute(meshNormals, 3)
+        )
+        geometry.setIndex(indices)
+
+        geometry.attributes.position!.needsUpdate = true
+        geometry.attributes.normal!.needsUpdate = true
+        if (geometry.index) geometry.index.needsUpdate = true
+        geometry.setDrawRange(0, indices.length)
+
+        const material = mesh.material
+        if (material instanceof THREE.MeshBasicMaterial) {
+            material.color.copy(color)
+            material.opacity = strokeOpacity
+            material.needsUpdate = true
+        }
+    }
+
+    const getPlaneIntersection = useCallback(
+        (event: PointerEvent): StrokeSample | null => {
+            const plane = planeRef.current
+            if (!plane) return null
+
+            const canvas = gl.domElement
+            const rect = canvas.getBoundingClientRect()
+
+            const mouse = new THREE.Vector2(
+                ((event.clientX - rect.left) / rect.width) * 2 - 1,
+                -((event.clientY - rect.top) / rect.height) * 2 + 1
+            )
+
+            const raycaster = new THREE.Raycaster()
+            raycaster.setFromCamera(mouse, camera)
+
+            const intersects = raycaster.intersectObject(plane)
+            const intersection = intersects[0]
+            if (!intersection?.face) return null
+
+            return {
+                point: intersection.point.clone(),
+                normal: intersection.face.normal
+                    .clone()
+                    .transformDirection(intersection.object.matrixWorld)
+                    .normalize(),
+            }
+        },
+        [camera, gl]
+    )
+
+    function startDrawing(event: PointerEvent): void {
+        if (event.pointerType !== pointerType) return
+        if (!planeRef.current) return
+
+        isDrawing = true
+        points = []
+        pressures = []
+        normals = []
+
+        // The original destructured the result directly, which threw when
+        // the ray missed the plane.
+        const intersection = getPlaneIntersection(event)
+        if (!intersection) return
+
+        startPoint = intersection.point.clone()
+        currentNormal = intersection.normal.clone()
+        currentMesh = createInitialLineMesh()
+
+        const pressure = 1.0
+
+        points.push(startPoint.clone())
+        pressures.push(pressure)
+        normals.push(currentNormal)
+
+        if (drawShapeType === 'free_hand') {
+            const secondPoint = new THREE.Vector3()
+                .copy(startPoint)
+                .addScalar(0.001)
+            points.push(secondPoint)
+            pressures.push(pressure)
+            normals.push(currentNormal)
+        }
+
+        updateLine(currentMesh, points, pressures, normals)
+    }
+
+    function continueDrawing(event: PointerEvent): void {
+        if (event.pointerType !== pointerType) return
+        if (!isDrawing || !planeRef.current || !currentMesh) return
+
+        const intersection = getPlaneIntersection(event)
+        if (!intersection) return
+
+        const { point, normal } = intersection
+        const pressure = 1.0
+
+        if (drawShapeType === 'free_hand') {
+            const newPoint = point.clone()
+            const last = points[points.length - 1]
+            if (last && newPoint.distanceTo(last) < DISTANCE_THRESHOLD) return
+
+            points.push(newPoint)
+            pressures.push(pressure)
+            normals.push(normal)
+
+            if (points.length > MAX_POINTS) {
+                points.shift()
+                pressures.shift()
+                normals.shift()
+            }
+
+            updateLine(currentMesh, points, pressures, normals)
+        } else if (drawShapeType === 'straight') {
+            if (!startPoint || !currentNormal) return
+
+            const { snappedEnd } = getSnappedLinePointsInPlane({
+                startPoint,
+                currentPoint: point,
+                normal,
+                camera,
+                snapAngle: 1,
+                pointDensity: 0.05,
+            })
+
+            points = [startPoint.clone(), snappedEnd.clone()]
+            pressures = [pressure, pressure]
+            normals = [currentNormal.clone(), normal.clone()]
+
+            updateLine(currentMesh, points, pressures, normals)
+        } else if (drawShapeType === 'circle') {
+            if (!startPoint || !currentNormal) return
+
+            const radius = startPoint.distanceTo(point)
+            const { circlePoints, circleNormals } = generateCirclePointsWorld(
+                startPoint,
+                currentNormal,
+                radius
+            )
+
+            updateLine(
+                currentMesh,
+                circlePoints,
+                Array(circlePoints.length).fill(pressure),
+                circleNormals
+            )
+        } else if (drawShapeType === 'arc') {
+            if (!startPoint || !currentNormal) return
+
+            const radius = startPoint.distanceTo(point)
+            const { arcPoints, arcNormals } = generateSemiCircleOpenArcWorld(
+                startPoint,
+                currentNormal,
+                radius
+            )
+
+            updateLine(
+                currentMesh,
+                arcPoints,
+                Array(arcPoints.length).fill(pressure),
+                arcNormals
+            )
+        }
+    }
+
+    /** Publishes the swept surface and tears down the preview tube. */
+    function publishRibbon(wrappedRibbon: THREE.BufferGeometry): void {
+        const ribbonMaterial = new THREE.MeshBasicMaterial({
+            color: color,
+            wireframe: false,
+            transparent: true,
+            opacity: 0.25,
+            side: THREE.DoubleSide,
+            forceSinglePass: true,
+            depthTest: true,
+            depthWrite: true,
+        })
+
+        const ribbonMesh = new THREE.Mesh(wrappedRibbon, ribbonMaterial)
+        ribbonMesh.userData.type = 'BEND_GUIDE_PLANE'
+        scene.add(ribbonMesh)
+
+        if (currentMesh) {
+            scene.remove(currentMesh)
+            currentMesh.geometry.dispose()
+            const material = currentMesh.material
+            if (!Array.isArray(material)) material.dispose()
+        }
+
+        onDrawingFinished(ribbonMesh)
+    }
+
+    function stopDrawing(event: PointerEvent): void {
+        if (!isDrawing || !planeRef.current) return
+
+        if (drawShapeType === 'free_hand' || drawShapeType === 'straight') {
+            if (!currentMesh || !startPoint || points.length < 2) {
+                if (currentMesh) scene.remove(currentMesh)
+                currentMesh = null
+                startPoint = null
+                return
+            }
+
+            const wrappedRibbon = bendOGGuide(ogGuidePoints, points, 1, {
+                ...BEND_OPTIONS,
+                closedPath: false,
+                guidePointNormals: ogGuideNormals,
+                guidePathPointNormals: normals,
+            })
+
+            if (wrappedRibbon) publishRibbon(wrappedRibbon)
+        } else if (drawShapeType === 'circle') {
+            if (!startPoint || !currentNormal || !currentMesh) return
+
+            const lastPoint =
+                getPlaneIntersection(event)?.point ??
+                points[points.length - 1] ??
+                startPoint
+            const radius = startPoint.distanceTo(lastPoint)
+
+            const { circlePoints, circleNormals } = generateCirclePointsWorld(
+                startPoint,
+                currentNormal,
+                radius
+            )
+
+            updateLine(
+                currentMesh,
+                circlePoints,
+                Array(circlePoints.length).fill(pressures[0] ?? 1.0),
+                circleNormals
+            )
+
+            const wrappedRibbon = bendOGGuide(ogGuidePoints, circlePoints, 1, {
+                ...BEND_OPTIONS,
+                closedPath: true,
+                guidePointNormals: ogGuideNormals,
+                guidePathPointNormals: circleNormals,
+            })
+
+            if (wrappedRibbon) publishRibbon(wrappedRibbon)
+        } else if (drawShapeType === 'arc') {
+            if (!startPoint || !currentNormal || !currentMesh) return
+
+            const lastPoint =
+                getPlaneIntersection(event)?.point ??
+                points[points.length - 1] ??
+                startPoint
+            const radius = startPoint.distanceTo(lastPoint)
+
+            const { arcPoints, arcNormals } = generateSemiCircleOpenArcWorld(
+                startPoint,
+                currentNormal,
+                radius
+            )
+
+            updateLine(
+                currentMesh,
+                arcPoints,
+                Array(arcPoints.length).fill(pressures[0] ?? 1.0),
+                arcNormals
+            )
+
+            const wrappedRibbon = bendOGGuide(ogGuidePoints, arcPoints, 1, {
+                ...BEND_OPTIONS,
+                closedPath: false,
+                guidePointNormals: ogGuideNormals,
+                guidePathPointNormals: arcNormals,
+            })
+
+            if (wrappedRibbon) publishRibbon(wrappedRibbon)
+        }
+
+        currentMesh = null
+        startPoint = null
+        currentNormal = null
+        isDrawing = false
+    }
+
+    /** Keeps the scratch plane square-on to the camera. */
+    const SyncCameraFromMain = () => {
+        const { camera: mainCamera } = useThree()
+        useFrame(() => {
+            const plane = planeRef.current
+            if (!plane && drawGuide) return
+            plane?.rotation.copy(mainCamera.rotation)
+        })
+        return null
+    }
+
+    return (
+        <>
+            {ogGuidePoints && bendPlaneGuide && <SyncCameraFromMain />}
+            {ogGuidePoints && bendPlaneGuide && (
+                <mesh
+                    ref={planeRef}
+                    position={[0, 0, 0]}
+                    rotation={[0, 0, 0]}
+                    onPointerDown={(e) => startDrawing(e.nativeEvent)}
+                    onPointerMove={(e) => continueDrawing(e.nativeEvent)}
+                    onPointerUp={(e) => stopDrawing(e.nativeEvent)}
+                >
+                    <planeGeometry args={[4000, 4000]} />
+                    <meshBasicMaterial
+                        visible={false}
+                        color="#f0f0f0"
+                        transparent
+                        opacity={0}
+                        side={THREE.DoubleSide}
+                    />
+                </mesh>
+            )}
+        </>
+    )
+}
+
+export default DynamicBendGuidePlane
