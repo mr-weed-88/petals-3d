@@ -1,25 +1,27 @@
-import PenIcon from '../svg-icons/PenIcon'
+import {
+    IconArrowsMove,
+    IconBallpen,
+    IconCheck,
+    IconCircle,
+    IconCopy,
+    IconEraser,
+    IconLine,
+    IconPalette,
+    IconPointer2,
+    IconResize,
+    IconRotate,
+    IconScribble,
+    IconSparkles,
+    IconVectorSpline,
+    IconX,
+} from '@tabler/icons-react'
 
-import ArcIcon from '../svg-icons/ArcIcon'
-import CopyIcon from '../svg-icons/CopyIcon'
-import ScaleIcon from '../svg-icons/ScaleIcon'
 import GuideIcon from '../svg-icons/GuideIcon'
-import SelectIcon from '../svg-icons/SelectIcon'
-import EraserIcon from '../svg-icons/EraserIcon'
-import RotateIcon from '../svg-icons/RotateIcon'
-import RenderIcon from '../svg-icons/RenderIcon'
-import CircleIcon from '../svg-icons/CircleIcon'
 import SelectGuide from '../svg-icons/SelectGuide'
-import CorrectIcon from '../svg-icons/CorrectIcon'
-import FreeHandIcon from '../svg-icons/FreeHandIcon'
 import LocalModeIcon from '../svg-icons/LocalModeIcon'
-import TranslateIcon from '../svg-icons/TranslateIcon'
 import LoftGuideIcon from '../svg-icons/LoftGuideIcon'
 import GlobalModeIcon from '../svg-icons/GlobalModeIcon'
 import EraseGuideIcon from '../svg-icons/EraseGuideIcon'
-import ColorSelectIcon from '../svg-icons/ColorSelectIcon'
-import WrongButtonIcon from '../svg-icons/WrongButtonIcon'
-import StraightLineIcon from '../svg-icons/StraightLineIcon'
 import BendGuidePlaneIcon from '../svg-icons/BendGuidePlaneIcon'
 
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
@@ -353,7 +355,7 @@ const ToolPanel = (props) => {
 
     return (
         <>
-            <div className="absolute top-[12px] right-[12px] z-5 flex items-center gap-[4px] p-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#FFFFFF]">
+            <div className="absolute top-[12px] right-[12px] z-5 flex items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl">
                 {!dynamicDrawingPlaneMesh && (
                     <ToolTip text="Draw Guide" position="bottom" delay={100}>
                         <div onClick={(e) => handleDraw('draw_guide')}>
@@ -432,16 +434,17 @@ const ToolPanel = (props) => {
                     </ToolTip>
                 )}
 
-                <div className="px-[8px]text=[#000000]">|</div>
+                <div className="px-[8px] text-[#000000]">|</div>
 
                 <ToolTip text="Pen" position="bottom" delay={100}>
                     <div onClick={(e) => handleDraw('pen')}>
                         <ToolButton
                             condition={penActive}
                             icon={
-                                <PenIcon
+                                <IconBallpen
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
@@ -453,9 +456,10 @@ const ToolPanel = (props) => {
                         <ToolButton
                             condition={eraserActive}
                             icon={
-                                <EraserIcon
+                                <IconEraser
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
@@ -467,25 +471,27 @@ const ToolPanel = (props) => {
                         <ToolButton
                             condition={selectLines}
                             icon={
-                                <SelectIcon
+                                <IconPointer2
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
                     </div>
                 </ToolTip>
 
-                <div className="px-[8px] text=[#000000]">|</div>
+                <div className="px-[8px] text-[#000000]">|</div>
 
                 <ToolTip text="Scene Options" position="bottom" delay={100}>
                     <div onClick={(e) => handleSceneOptions()}>
                         <ToolButton
                             condition={sceneOptions}
                             icon={
-                                <RenderIcon
+                                <IconSparkles
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
@@ -494,8 +500,8 @@ const ToolPanel = (props) => {
             </div>
 
             {loftGuidePlane && (
-                <div className="absolute funnel-sans-regular flex flex-col gap-[8px] top-[72px] left-[12px] text-[#000000]">
-                    <div className="w-[140px] md:w-[198px] z-5 p-[4px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#FFFFFF]">
+                <div className="absolute top-[72px] left-[12px] flex flex-col gap-[8px] font-funnel font-normal text-[#000000]">
+                    <div className="z-5 w-[140px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:w-[198px]">
                         <RangeSlider
                             name="Radial Percentage"
                             max={100}
@@ -507,7 +513,7 @@ const ToolPanel = (props) => {
                             setUpdatingBackground={setRadialBackground}
                         />
                     </div>
-                    <div className="w-[140px] md:w-[198px] z-5 p-[4px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#FFFFFF]">
+                    <div className="z-5 w-[140px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:w-[198px]">
                         <RangeSlider
                             name="Waist Percentage"
                             max={100}
@@ -520,7 +526,7 @@ const ToolPanel = (props) => {
                         />
                     </div>
 
-                    <div className="w-[140px] md:w-[198px] z-5 p-[4px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#FFFFFF]">
+                    <div className="z-5 w-[140px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:w-[198px]">
                         <RangeSlider
                             name="Poly count Percentage"
                             max={50}
@@ -538,15 +544,16 @@ const ToolPanel = (props) => {
             {penActive && <PenOptionsPanel isSmall={isSmall} />}
 
             {loftGuidePlane && (
-                <div className="funnel-sans-regular absolute bottom-[4px] left-1/2 -translate-x-1/2 -translate-y-1/2 z-5 rounded-[8px] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#FFFFFF]">
-                    <div className="flex justify-center items-center gap-[8px] p-[4px]">
+                <div className="absolute bottom-[4px] left-1/2 z-5 -translate-1/2 rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] font-funnel font-normal drop-shadow-xl">
+                    <div className="flex items-center justify-center gap-[8px] p-[4px]">
                         <div onClick={(e) => handleDraw('cancel_loft_guide')}>
                             <ToolButton
                                 condition={sceneOptions}
                                 icon={
-                                    <WrongButtonIcon
+                                    <IconX
                                         color="#DE3163"
                                         size={isSmall ? 12 : 20}
+                                        stroke={1}
                                     />
                                 }
                             />
@@ -556,9 +563,10 @@ const ToolPanel = (props) => {
                             <ToolButton
                                 condition={sceneOptions}
                                 icon={
-                                    <CorrectIcon
+                                    <IconCheck
                                         color="#5CA367"
                                         size={isSmall ? 12 : 20}
+                                        stroke={1}
                                     />
                                 }
                             />
@@ -568,35 +576,39 @@ const ToolPanel = (props) => {
             )}
 
             {(drawGuide || bendPlaneGuide) && (
-                <div className="absolute top-[72px] left-[12px] z-5 p-[4px] flex flex-col justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#FFFFFF]">
+                <div className="absolute top-[72px] left-[12px] z-5 flex flex-col justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl">
                     <ToolTip text="Draw Shape" position="right" delay={100}>
                         <button
                             onClick={(e) => handleShapeOptions(e)}
-                            className="hover:bg-[#5CA367]/25 font-bold p-[8px] cursor-pointer rounded-[4px]"
+                            className="cursor-pointer rounded-[4px] p-[8px] font-bold hover:bg-[#5CA367]/25"
                         >
                             {drawShapeType === 'free_hand' && (
-                                <FreeHandIcon
+                                <IconScribble
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             )}
                             {drawShapeType === 'straight' && (
-                                <StraightLineIcon
+                                <IconLine
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             )}
                             {drawShapeType === 'circle' && (
-                                <CircleIcon
+                                <IconCircle
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             )}
 
                             {drawShapeType === 'arc' && (
-                                <ArcIcon
+                                <IconVectorSpline
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             )}
                         </button>
@@ -605,7 +617,7 @@ const ToolPanel = (props) => {
             )}
 
             {(drawGuide || bendPlaneGuide) && openDrawShapeOptions && (
-                <div className="absolute flex flex-col justify-items-center gap-[4px] top-[72px] left-[72px] z-5 p-[4px] rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl bg-[#000000]">
+                <div className="absolute top-[72px] left-[72px] z-5 flex flex-col justify-items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl">
                     <ToolTip text="Free hand" position="right" delay={100}>
                         <div
                             onClick={(e) =>
@@ -615,9 +627,10 @@ const ToolPanel = (props) => {
                             <ToolButton
                                 condition={false}
                                 icon={
-                                    <FreeHandIcon
+                                    <IconScribble
                                         color="#000000"
                                         size={isSmall ? 12 : 20}
+                                        stroke={1}
                                     />
                                 }
                             />
@@ -633,9 +646,10 @@ const ToolPanel = (props) => {
                             <ToolButton
                                 condition={false}
                                 icon={
-                                    <StraightLineIcon
+                                    <IconLine
                                         color="#000000"
                                         size={isSmall ? 12 : 20}
+                                        stroke={1}
                                     />
                                 }
                             />
@@ -650,9 +664,10 @@ const ToolPanel = (props) => {
                             <ToolButton
                                 condition={false}
                                 icon={
-                                    <CircleIcon
+                                    <IconCircle
                                         color="#000000"
                                         size={isSmall ? 12 : 20}
+                                        stroke={1}
                                     />
                                 }
                             />
@@ -667,9 +682,10 @@ const ToolPanel = (props) => {
                             <ToolButton
                                 condition={false}
                                 icon={
-                                    <ArcIcon
+                                    <IconVectorSpline
                                         color="#000000"
                                         size={isSmall ? 12 : 20}
+                                        stroke={1}
                                     />
                                 }
                             />
@@ -679,15 +695,16 @@ const ToolPanel = (props) => {
             )}
 
             {(selectLines || selectGuide) && (
-                <div className="absolute flex flex-col justify-items-center gap-[4px] top-[72px] left-[12px] z-5 p-[4px] rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl">
+                <div className="absolute top-[72px] left-[12px] z-5 flex flex-col justify-items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl">
                     {selectLines && (
                         <button
                             onClick={(e) => handleColorChange(e)}
-                            className="hover:bg-[#5CA367]/25 font-bold flex justify-center items-center m-[8px] cursor-pointer rounded-[4px] border-[0px]"
+                            className="m-[8px] flex cursor-pointer items-center justify-center rounded-[4px] border-[0px] font-bold hover:bg-[#5CA367]/25"
                         >
-                            <ColorSelectIcon
+                            <IconPalette
                                 color={lineColor}
                                 size={isSmall ? 12 : 20}
+                                stroke={1}
                             />
                         </button>
                     )}
@@ -696,9 +713,10 @@ const ToolPanel = (props) => {
                         <ToolButton
                             condition={transformMode === 'translate'}
                             icon={
-                                <TranslateIcon
+                                <IconArrowsMove
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
@@ -708,9 +726,10 @@ const ToolPanel = (props) => {
                         <ToolButton
                             condition={transformMode === 'rotate'}
                             icon={
-                                <RotateIcon
+                                <IconRotate
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
@@ -721,9 +740,10 @@ const ToolPanel = (props) => {
                             bg="bg-[#5CA367]"
                             condition={transformMode === 'scale'}
                             icon={
-                                <ScaleIcon
+                                <IconResize
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             }
                         />
@@ -732,7 +752,7 @@ const ToolPanel = (props) => {
                     {axisMode === 'world' && (
                         <button
                             onClick={(e) => setAxisMode('local')}
-                            className="hover:bg-[#5CA367]/25 font-bold p-[8px] cursor-pointer rounded-[4px]"
+                            className="cursor-pointer rounded-[4px] p-[8px] font-bold hover:bg-[#5CA367]/25"
                         >
                             <GlobalModeIcon
                                 color="#000000"
@@ -744,7 +764,7 @@ const ToolPanel = (props) => {
                     {axisMode === 'local' && (
                         <button
                             onClick={(e) => setAxisMode('world')}
-                            className="hover:bg-[#5CA367]/25 font-bold p-[8px] cursor-pointer rounded-[4px]"
+                            className="cursor-pointer rounded-[4px] p-[8px] font-bold hover:bg-[#5CA367]/25"
                         >
                             <LocalModeIcon color="#000000" />
                         </button>
@@ -754,11 +774,12 @@ const ToolPanel = (props) => {
                         <button
                             disabled={copy}
                             onClick={(e) => setCopy(!copy)}
-                            className="hover:bg-[#5CA367]/25 font-bold p-[8px] cursor-pointer rounded-[4px]"
+                            className="cursor-pointer rounded-[4px] p-[8px] font-bold hover:bg-[#5CA367]/25"
                         >
-                            <CopyIcon
+                            <IconCopy
                                 color="#000000"
                                 size={isSmall ? 12 : 20}
+                                stroke={1}
                             />
                         </button>
                     )}
@@ -766,7 +787,7 @@ const ToolPanel = (props) => {
             )}
 
             {selectLines && openColorOptions && (
-                <div className="funnel-sans-regular absolute top-[72px] left-[72px] z-5 p-[8px] rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl">
+                <div className="absolute top-[72px] left-[72px] z-5 rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[8px] font-funnel font-normal drop-shadow-xl">
                     <ColorPicker
                         value={lineColor}
                         onChange={setLineColor}

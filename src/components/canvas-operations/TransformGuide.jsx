@@ -31,8 +31,8 @@ const TransformGuide = () => {
             transformMode === 'translate'
                 ? 0
                 : transformMode === 'rotate'
-                ? 1
-                : 2
+                  ? 1
+                  : 2
         const gizmo = helper.children[gizmoIndex]
         if (!gizmo) return
 

@@ -9,7 +9,9 @@ export default defineConfig({
     },
     build: {
         sourcemap: false,
-        minify: 'esbuild',
+        // Vite 8 bundles Rolldown and no longer ships esbuild, so its
+        // minifier is oxc. `minify: 'esbuild'` fails to resolve here.
+        minify: 'oxc',
         target: 'es2017',
         outDir: 'dist',
     },

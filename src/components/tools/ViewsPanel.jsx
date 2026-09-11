@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect } from 'react'
 
-import LockIcon from '../svg-icons/LockIcon'
-import UndoIcon from '../svg-icons/UndoIcon'
-import RedoIcon from '../svg-icons/RedoIcon'
-import GridIcon from '../svg-icons/GridIcon'
-import CameraFovIcon from '../svg-icons/CameraFovIcon'
-import FullScreenIcon from '../svg-icons/FullScreenIcon'
+import {
+    IconArrowBackUp,
+    IconArrowForwardUp,
+    IconGridDots,
+    IconLock,
+    IconMaximize,
+    IconPerspective,
+} from '@tabler/icons-react'
+
 import OrthograhicView from '../svg-icons/OrthograhicView'
 
 import { canvasViewStore } from '../../hooks/useCanvasViewStore'
@@ -102,19 +105,20 @@ const ViewsPanel = ({ isSmall }) => {
 
     return (
         <>
-            <div className="flex flex-col gap-[4px] p-[4px] absolute bottom-[16px] left-[12px] rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl">
+            <div className="absolute bottom-[16px] left-[12px] flex flex-col gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl">
                 <ToolTip text="Full screen" position="right" delay={100}>
                     <button
                         onClick={(e) => handleFullscreenToggle(e)}
-                        className={`text-[#FFFFFF] flex justify-center font-bold p-[8px] cursor-pointer rounded-[4px] border-[0px] ${
+                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
                             fullScreen
                                 ? 'bg-[#5CA367]'
                                 : 'hover:bg-[#5CA367]/75'
                         }`}
                     >
-                        <FullScreenIcon
+                        <IconMaximize
                             color="#000000"
                             size={isSmall ? 12 : 20}
+                            stroke={1}
                         />
                     </button>
                 </ToolTip>
@@ -122,10 +126,10 @@ const ViewsPanel = ({ isSmall }) => {
                 <ToolTip text="Perfect View" position="right" delay={100}>
                     <button
                         onClick={(e) => setIsOrthographic(!isOrthographic)}
-                        className={`text-[#FFFFFF] flex justify-center font-bold p-[8px] cursor-pointer rounded-[4px] border-[0px] ${
+                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
                             isOrthographic
                                 ? 'bg-[#5CA367]'
-                                : ' hover:bg-[#5CA367]/75'
+                                : 'hover:bg-[#5CA367]/75'
                         }`}
                     >
                         <OrthograhicView
@@ -139,15 +143,16 @@ const ViewsPanel = ({ isSmall }) => {
                     <button
                         disabled={isOrthographic}
                         onClick={(e) => handleViewActions('fov_slider')}
-                        className={`text-[#FFFFFF] flex justify-center font-bold p-[8px] cursor-pointer rounded-[4px] border-[0px] ${
+                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
                             showFovSlider && !isOrthographic
                                 ? 'bg-[#5CA367]'
-                                : ' hover:bg-[#5CA367]/75'
+                                : 'hover:bg-[#5CA367]/75'
                         }`}
                     >
-                        <CameraFovIcon
+                        <IconPerspective
                             color="#000000"
                             size={isSmall ? 12 : 20}
+                            stroke={1}
                         />
                     </button>
                 </ToolTip>
@@ -155,48 +160,64 @@ const ViewsPanel = ({ isSmall }) => {
                 <ToolTip text="Enable Grids" position="right" delay={100}>
                     <button
                         onClick={(e) => handleViewActions('grids')}
-                        className={`text-[#FFFFFF] flex justify-center font-bold p-[8px] cursor-pointer rounded-[4px] border-[0px] ${
+                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
                             showGridOptions
                                 ? 'bg-[#5CA367]'
-                                : ' hover:bg-[#5CA367]/75'
+                                : 'hover:bg-[#5CA367]/75'
                         }`}
                     >
-                        <GridIcon color="#000000" size={isSmall ? 12 : 20} />
+                        <IconGridDots
+                            color="#000000"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
                 </ToolTip>
 
                 <ToolTip text="Orbit Lock" position="right" delay={100}>
                     <button
                         onClick={(e) => setOrbitalLock(!orbitalLock)}
-                        className={`text-[#FFFFFF] flex justify-center font-bold p-[8px] cursor-pointer rounded-[4px] border-[0px] ${
+                        className={`flex cursor-pointer justify-center rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] ${
                             orbitalLock
                                 ? 'bg-[#5CA367]'
-                                : ' hover:bg-[#5CA367]/75'
+                                : 'hover:bg-[#5CA367]/75'
                         }`}
                     >
-                        <LockIcon color="#000000" size={isSmall ? 12 : 20} />
+                        <IconLock
+                            color="#000000"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
                 </ToolTip>
 
                 <ToolTip text="Undo" position="right" delay={100}>
                     <button
-                        className={`hover:bg-[#5CA367]/75  text-[#FFFFFF] font-bold p-[8px] cursor-pointer rounded-[4px] z-5 border-[0px]`}
+                        className={`z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] hover:bg-[#5CA367]/75`}
                     >
-                        <UndoIcon color="#000000" size={isSmall ? 12 : 20} />
+                        <IconArrowBackUp
+                            color="#000000"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
                 </ToolTip>
 
                 <ToolTip text="Redo" position="right" delay={100}>
                     <button
-                        className={`hover:bg-[#5CA367]/75  text-[#FFFFFF] font-bold p-[8px] cursor-pointer rounded-[4px] z-5 border-[0px]`}
+                        className={`z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF] hover:bg-[#5CA367]/75`}
                     >
-                        <RedoIcon color="#000000" size={isSmall ? 12 : 20} />
+                        <IconArrowForwardUp
+                            color="#000000"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
                 </ToolTip>
             </div>
 
             {showFovSlider && !isOrthographic && (
-                <div className="absolute bottom-[140px] md:bottom-[184px] left-[58px] md:left-[72px] w-[140px] md:w-[198px] z-5 p-[4px] justify-center rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl">
+                <div className="absolute bottom-[140px] left-[58px] z-5 w-[140px] justify-center rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:bottom-[184px] md:left-[72px] md:w-[198px]">
                     <RangeSlider
                         name="Camera Fov"
                         max={100}
@@ -212,16 +233,20 @@ const ViewsPanel = ({ isSmall }) => {
             )}
 
             {showGridOptions && (
-                <div className="absolute bottom-[208px] md:bottom-[256px] left-[58px] md:left-[72px] z-5 gap-[4px] p-[4px] flex justify-center rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl">
+                <div className="absolute bottom-[208px] left-[58px] z-5 flex justify-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:bottom-[256px] md:left-[72px]">
                     <button
                         onClick={(e) => setGridPlaneX(!gridPlaneX)}
                         className={`${
                             gridPlaneX
                                 ? 'bg-[#DE3163]/50'
-                                : ' hover:bg-[#5CA367]/75'
-                        }  text-[#FFFFFF] font-bold p-[8px] cursor-pointer rounded-[4px] z-5 border-[0px]`}
+                                : 'hover:bg-[#5CA367]/75'
+                        } z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF]`}
                     >
-                        <GridIcon color="#DE3163" size={isSmall ? 12 : 20} />
+                        <IconGridDots
+                            color="#DE3163"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
 
                     <button
@@ -229,10 +254,14 @@ const ViewsPanel = ({ isSmall }) => {
                         className={`${
                             gridPlaneY
                                 ? 'bg-[#50C878]/50'
-                                : ' hover:bg-[#5CA367]/75'
-                        }  text-[#FFFFFF] font-bold p-[8px] cursor-pointer rounded-[4px] z-5 border-[0px]`}
+                                : 'hover:bg-[#5CA367]/75'
+                        } z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF]`}
                     >
-                        <GridIcon color="#50C878" size={isSmall ? 12 : 20} />
+                        <IconGridDots
+                            color="#50C878"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
 
                     <button
@@ -240,10 +269,14 @@ const ViewsPanel = ({ isSmall }) => {
                         className={`${
                             gridPlaneZ
                                 ? 'bg-[#0096FF]/50'
-                                : ' hover:bg-[#5CA367]/75'
-                        }  text-[#FFFFFF] font-bold p-[8px] cursor-pointer rounded-[4px] z-5 border-[0px]`}
+                                : 'hover:bg-[#5CA367]/75'
+                        } z-5 cursor-pointer rounded-[4px] border-[0px] p-[8px] font-bold text-[#FFFFFF]`}
                     >
-                        <GridIcon color="#0096FF" size={isSmall ? 12 : 20} />
+                        <IconGridDots
+                            color="#0096FF"
+                            size={isSmall ? 12 : 20}
+                            stroke={1}
+                        />
                     </button>
                 </div>
             )}

@@ -4,7 +4,6 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { saveGroupToIndexDB } from '../../db/storage'
 import { eraseLineType, Fade } from '../../config/objectsConfig'
 
-import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 

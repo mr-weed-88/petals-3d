@@ -1,0 +1,5 @@
+#!/bin/sh
+# Runs eslint --fix and prettier --write over staged files only.
+# Enabled by `npm install` via the "prepare" script, which points
+# git at this directory. To bypass once: git commit --no-verify
+npx lint-staged

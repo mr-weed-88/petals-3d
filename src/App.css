@@ -1,67 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Funnel+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 @import 'tailwindcss';
+@config '../tailwind.config.js';
 
-@layer utilities {
-    @keyframes fade-in {
-        from {
-            opacity: 0;
-            transform: scale(0.95);
-        }
-        to {
-            opacity: 1;
-            transform: scale(1);
-        }
-    }
+/*
+ * The theme (fonts, keyframes, animations, breakpoints) lives in
+ * tailwind.config.js, loaded by the @config directive above.
+ *
+ * Everything that can be expressed as a utility now lives inline on the
+ * element that uses it. What remains below is only what a utility cannot
+ * reach: document-level resets on html, body and #root, none of which are
+ * rendered by React.
+ */
 
-    @keyframes fade-out {
-        from {
-            opacity: 1;
-            transform: scale(1);
-        }
-        to {
-            opacity: 0;
-            transform: scale(0.95);
-        }
-    }
-
-    .animate-fade-in {
-        animation: fade-in 0.2s ease-out forwards;
-    }
-
-    .animate-fade-out {
-        animation: fade-out 0.2s ease-in forwards;
-    }
-}
-
-@keyframes tooltipFadeIn {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
+/*
+ * Document-level reset. These target html, body and #root, none of which
+ * are rendered by React, so they cannot carry utility classes.
+ *
+ * The editor is a fixed-viewport app: the page itself never scrolls, and
+ * browser gestures (pull-to-refresh, overscroll, double-tap zoom) are
+ * suppressed so they cannot fire mid-stroke on a tablet.
+ */
 html,
 body {
-    overscroll-behavior: none;
-    touch-action: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-    -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
     overflow: hidden;
-    scroll-behavior: auto !important;
     background-color: #ffffff;
+    overscroll-behavior: none;
+    touch-action: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    -webkit-overflow-scrolling: auto;
 }
 
 #root {
@@ -71,222 +44,14 @@ body {
     background-color: #ffffff;
 }
 
-.app-container {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-    width: 100vw;
-    background-color: #ffffff;
-}
-
 * {
     overscroll-behavior: none;
-    scroll-behavior: auto !important;
-}
-
-canvas {
-    touch-action: none;
-    -webkit-user-select: none;
-    -moz-user-select: none;
-    user-select: none;
-}
-
-body {
-    -webkit-overflow-scrolling: auto;
-}
-
-::-webkit-scrollbar {
-    display: none;
-    width: 0 !important;
-    height: 0 !important;
-}
-
-* {
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
-.canvas-container {
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
-.overflow-y-auto,
-.custom-scrollbar {
-    touch-action: pan-y !important;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-    display: block !important;
-    width: 6px !important;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #888;
-    border-radius: 10px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #555;
-}
-
-.custom-scrollbar {
-    scrollbar-width: thin !important;
-    scrollbar-color: #888 #f1f1f1 !important;
-}
-
-.custom-scrollbar input[type='checkbox'] {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.custom-scrollbar input[type='checkbox']:focus {
-    outline: none;
-    scroll-margin: 0;
-}
-
-.custom-scrollbar {
-    contain: layout style paint;
-}
-
-.prevent-select {
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-/* Fonts */
-.funnel-sans-regular {
-    font-family: 'Funnel Sans', sans-serif;
-    font-optical-sizing: auto;
-    font-weight: 400;
-    font-style: normal;
-}
-
-.funnel-sans-semibold {
-    font-family: 'Funnel Sans', sans-serif;
-    font-optical-sizing: auto;
-    font-weight: 600;
-    font-style: normal;
-}
-
-.funnel-sans-bold {
-    font-family: 'Funnel Sans', sans-serif;
-    font-optical-sizing: auto;
-    font-weight: 700;
-    font-style: normal;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
+*::-webkit-scrollbar {
     display: none;
-}
-
-.custom-scrollbar {
-    -ms-overflow-style: none; /* For Internet Explorer and Edge */
-    scrollbar-width: none; /* For Firefox */
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    display: none;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    display: none;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    display: none;
-}
-
-.custom-scrollbar {
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-}
-
-.custom-scrollbar {
-    touch-action: pan-y !important;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    contain: layout style paint;
-}
-
-.custom-scrollbar input[type='checkbox'] {
-    position: absolute;
-    opacity: 0;
-    pointer-events: none;
-}
-
-.custom-scrollbar input[type='checkbox']:focus {
-    outline: none;
-    scroll-margin: 0;
-}
-
-.range-container {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    background-color: #ffffff;
-    width: 100%;
-    height: 100%;
-}
-
-.range-wrapper {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-}
-
-input[type='range'] {
-    -webkit-appearance: none;
-    background: #a7a7a7;
-    height: 5px;
-    border-radius: 50px;
-    background-image: linear-gradient(#5ca367, #5ca367);
-    background-size: 100% 100%;
-    background-repeat: no-repeat;
-    cursor: pointer;
-    width: 200px;
-}
-
-input[type='range']::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 15px;
-    height: 15px;
-    background-color: #2c2c2c;
-    border-radius: 50%;
-}
-
-input[type='range']::-moz-range-thumb {
-    -webkit-appearance: none;
-    width: 15px;
-    height: 15px;
-    background-color: #d5d4d8;
-    border: none;
-    border-radius: 50%;
-}
-
-input[type='number']::-webkit-outer-spin-button,
-input[type='number']::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-}
-
-input[type='number'] {
-    -moz-appearance: textfield;
+    width: 0;
+    height: 0;
 }

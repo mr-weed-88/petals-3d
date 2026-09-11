@@ -1,4 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react'
+
+import {
+    IconBallpen,
+    IconBrandGithub,
+    IconDownload,
+    IconHandFinger,
+    IconMenu2,
+    IconMouse,
+} from '@tabler/icons-react'
 import { v4 as uuid } from 'uuid'
 import { toast } from 'react-toastify'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
@@ -6,15 +15,6 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import Canvas3d from './Canvas3d'
 import ToolPanel from '../tools/ToolPanel'
 import ViewsPanel from '../tools/ViewsPanel'
-
-import PenIcon from '../svg-icons/PenIcon'
-import SaveIcon from '../svg-icons/SaveIcon'
-import DarkIcon from '../svg-icons/DarkIcon'
-import MouseIcon from '../svg-icons/MouseIcon'
-import TouchIcon from '../svg-icons/TouchIcon'
-import LightIcon from '../svg-icons/LightIcon'
-import GitHubIcon from '../svg-icons/GitHubIcon'
-import BurgerIcon from '../svg-icons/BurgerIcon'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
@@ -31,8 +31,8 @@ import { Fade } from '../../config/objectsConfig'
 import { loadSceneFromIndexedDB, saveGroupToIndexDB } from '../../db/storage'
 
 const Editor = () => {
-    const [error, setError] = useState(false)
-    const [loading, setLoading] = useState(false)
+    const [, setError] = useState(false)
+    const [, setLoading] = useState(false)
     const [isSmall, setIsSmall] = useState(window.innerWidth < 768)
     const [showOptions, setShowOptions] = useState(true)
 
@@ -365,61 +365,67 @@ const Editor = () => {
         <>
             <DisableBrowserGestures />
 
-            <div className="flex w-screen h-screen overflow-hidden prevent-select z-5">
-                <div className="absolute top-[12px] left-[12px] z-5 flex items-center gap-[4px] p-[4px] rounded-[8px]  border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] hover:bg-[#5CA367]/75">
+            <div className="z-5 flex h-screen w-screen overflow-hidden select-none">
+                <div className="absolute top-[12px] left-[12px] z-5 flex items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] hover:bg-[#5CA367]/75">
                     <button
                         onClick={(e) => setShowOptions(!showOptions)}
-                        className="flex justify-center font-bold p-[8px] rounded-[4px]"
+                        className="flex justify-center rounded-[4px] p-[8px] font-bold"
                     >
-                        <BurgerIcon color="#000000" size={isSmall ? 8 : 12} />
+                        <IconMenu2
+                            color="#000000"
+                            size={isSmall ? 8 : 12}
+                            stroke={1}
+                        />
                     </button>
                 </div>
 
                 {showOptions && (
-                    <div className="absolute top-[72px] left-[12px] z-5 flex-col items-center gap-[4px] text-[8px] md:text-[12px] funnel-sans-regular rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl ">
+                    <div className="absolute top-[72px] left-[12px] z-5 flex-col items-center gap-[4px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] font-funnel text-[8px] font-normal drop-shadow-xl md:text-[12px]">
                         <ul>
                             <li
                                 onClick={(e) => downloadFile(e)}
-                                className="flex justify-between items-center text-[8px] m-[4px] md:text-[12px] funnel-sans-regular gap-[12px] hover:bg-[#5CA367]/25 rounded-[4px] cursor-pointer"
+                                className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[4px] font-funnel text-[8px] font-normal hover:bg-[#5CA367]/25 md:text-[12px]"
                             >
                                 <ToolTip
                                     text="Download model"
                                     position="right-bottom"
                                     delay={100}
                                 >
-                                    <button className="flex justify-center items-center font-bold px-[8px] rounded-[4px] cursor-pointer">
-                                        <SaveIcon
+                                    <button className="flex cursor-pointer items-center justify-center rounded-[4px] px-[8px] font-bold">
+                                        <IconDownload
                                             color="#000000"
                                             size={isSmall ? 12 : 16}
+                                            stroke={1}
                                         />
 
-                                        <div className="p-[12px] funnel-sans-regular">
+                                        <div className="p-[12px] font-funnel font-normal">
                                             Download file
                                         </div>
                                     </button>
                                 </ToolTip>
                             </li>
 
-                            <li className="flex justify-between items-center text-[8px] m-[4px] md:text-[12px] funnel-sans-regular gap-[12px] hover:bg-[#5CA367]/25 rounded-[4px] cursor-pointer">
+                            <li className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[4px] font-funnel text-[8px] font-normal hover:bg-[#5CA367]/25 md:text-[12px]">
                                 <ToolTip
                                     text="GitHub"
                                     position="bottom-right"
                                     delay={100}
                                 >
                                     <a
-                                        className="flex justify-center items-center font-bold px-[8px] rounded-[4px] cursor-pointer"
+                                        className="flex cursor-pointer items-center justify-center rounded-[4px] px-[8px] font-bold"
                                         href="https://github.com/SW881/petals-3d"
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
                                         <div>
-                                            <GitHubIcon
+                                            <IconBrandGithub
                                                 color="#000000"
                                                 size={isSmall ? 12 : 16}
+                                                stroke={1}
                                             />
                                         </div>
 
-                                        <div className="p-[12px] funnel-sans-regular">
+                                        <div className="p-[12px] font-funnel font-normal">
                                             GitHub
                                         </div>
                                     </a>
@@ -428,9 +434,9 @@ const Editor = () => {
 
                             <li className="flex border-b-[1px] border-[#4B5563]/25"></li>
 
-                            <li className="flex justify-between items-center p-[4px] m-[4px] gap-[12px]">
+                            <li className="m-[4px] flex items-center justify-between gap-[12px] p-[4px]">
                                 <div>Pointer</div>
-                                <div className="flex justify-between items-center gap-[4px]">
+                                <div className="flex items-center justify-between gap-[4px]">
                                     <ToolTip
                                         text="Stylus"
                                         position="bottom"
@@ -440,15 +446,16 @@ const Editor = () => {
                                             onClick={(e) =>
                                                 setPointerType('pen')
                                             }
-                                            className={`flex justify-center font-bold p-[8px] rounded-[4px] cursor-pointer ${
+                                            className={`flex cursor-pointer justify-center rounded-[4px] p-[8px] font-bold ${
                                                 pointerType === 'pen'
                                                     ? 'bg-[#5CA367]'
                                                     : 'hover:bg-[#5CA367]/25'
                                             }`}
                                         >
-                                            <PenIcon
+                                            <IconBallpen
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </button>
                                     </ToolTip>
@@ -462,15 +469,16 @@ const Editor = () => {
                                             onClick={(e) =>
                                                 setPointerType('mouse')
                                             }
-                                            className={`flex justify-center font-bold p-[8px] rounded-[4px] cursor-pointer ${
+                                            className={`flex cursor-pointer justify-center rounded-[4px] p-[8px] font-bold ${
                                                 pointerType === 'mouse'
                                                     ? 'bg-[#5CA367]'
                                                     : 'hover:bg-[#5CA367]/25'
                                             }`}
                                         >
-                                            <MouseIcon
+                                            <IconMouse
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </button>
                                     </ToolTip>
@@ -484,15 +492,16 @@ const Editor = () => {
                                             onClick={(e) =>
                                                 setPointerType('touch')
                                             }
-                                            className={`flex justify-center font-bold p-[8px] rounded-[4px] cursor-pointer ${
+                                            className={`flex cursor-pointer justify-center rounded-[4px] p-[8px] font-bold ${
                                                 pointerType === 'touch'
                                                     ? 'bg-[#5CA367]'
                                                     : 'hover:bg-[#5CA367]/25'
                                             }`}
                                         >
-                                            <TouchIcon
+                                            <IconHandFinger
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </button>
                                     </ToolTip>
@@ -510,7 +519,7 @@ const Editor = () => {
                 <div>
                     <ToolPanel isSmall={isSmall} />
                 </div>
-                <div className="flex-grow w-full h-full">
+                <div className="size-full grow">
                     <Canvas3d />
                 </div>
                 <div>

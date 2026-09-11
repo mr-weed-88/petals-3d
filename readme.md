@@ -28,18 +28,18 @@
 
 The Petals 3D editor (npm package) supports:
 
--   💯 Free & open-source.
--   🎨 Infinite, 3d canvas-based whitebox.
--   ✍️ Hand-drawn like style.
--   😀 Arbitary and Primitive Shapes.
--   🖼️ Export to GLTF.
--   💾 Local-first support (autosaves to the browser need to enable by developer).
--   🔍 Zoom and panning support.
--   🔙 Undo / Redo (need to work on it).
+- 💯 Free & open-source.
+- 🎨 Infinite, 3d canvas-based whitebox.
+- ✍️ Hand-drawn like style.
+- 😀 Arbitary and Primitive Shapes.
+- 🖼️ Export to GLTF.
+- 💾 Local-first support (autosaves to the browser need to enable by developer).
+- 🔍 Zoom and panning support.
+- 🔙 Undo / Redo (need to work on it).
 
 ## Tutorials
 
 The Petals 3D editor has small learning curve below are the YT links for understanding how to draw in 3d
 
--   Draw Donut - https://youtu.be/YLIo-D7Neu4
--   Draw Cafe - https://youtu.be/7K2tw7Xst64
+- Draw Donut - https://youtu.be/YLIo-D7Neu4
+- Draw Cafe - https://youtu.be/7K2tw7Xst64

@@ -7,7 +7,6 @@ import { toast } from 'react-toastify'
 import { Zoom } from 'react-toastify'
 
 import { saveGroupToIndexDB } from '../../db/storage'
-import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 import { Fade } from '../../config/objectsConfig'
@@ -166,8 +165,8 @@ const TransformLine = () => {
                 transformMode === 'translate'
                     ? 0
                     : transformMode === 'rotate'
-                    ? 1
-                    : 2
+                      ? 1
+                      : 2
 
             if (helper.children[gizmoIndex]) {
                 const gizmo = helper.children[gizmoIndex]
@@ -368,9 +367,12 @@ const TransformLine = () => {
                         obj.userData?.type === 'LOFT_SURFACE')
                 ) {
                     obj.userData.color = lineColor
-                    if (object.material) {
-                        object.material.color = lineColor
-                        object.material.needsUpdate = true
+                    if (obj.material) {
+                        // material.color is a THREE.Color, so it has to be
+                        // set through .set() rather than reassigned to a
+                        // hex string.
+                        obj.material.color.set(lineColor)
+                        obj.material.needsUpdate = true
                     }
                 }
             })
@@ -488,8 +490,6 @@ const TransformLine = () => {
                 isMerging.current = false
                 return
             }
-
-            const initialScale = objectsToMerge[0].scale.x
 
             let lines = []
             let geometries = []

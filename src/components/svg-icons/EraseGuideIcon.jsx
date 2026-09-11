@@ -13,14 +13,14 @@ const EraseGuideIcon = ({ color, size }) => {
             <path
                 d="M4 4L20 20"
                 stroke={color}
-                strokeWidth="1.5"
+                strokeWidth="1"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />
             <path
                 d="M4 20L20 4"
                 stroke={color}
-                strokeWidth="1.5"
+                strokeWidth="1"
                 strokeLinecap="round"
                 strokeLinejoin="round"
             />

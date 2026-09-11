@@ -3,7 +3,6 @@ import * as THREE from 'three'
 import { useThree } from '@react-three/fiber'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
-import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 
@@ -32,7 +31,7 @@ const DrawLine = () => {
     const tensionModeRef = useRef(false)
     const originalMirrorDataRef = useRef({})
     const initialTensionYRef = useRef(0)
-    const [tension, setTension] = useState(0.05)
+    const [, setTension] = useState(0.05)
 
     const originalPointsRef = useRef([])
     const originalPressuresRef = useRef([])
@@ -403,9 +402,6 @@ const DrawLine = () => {
         const positions = []
         const meshNormals = []
         const indices = []
-        const colors = []
-
-        const baseColor = new THREE.Color(strokeColor)
 
         const tangents = []
         for (let i = 0; i < pts.length - 1; i++) {

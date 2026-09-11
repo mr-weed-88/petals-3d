@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react'
-import DropperIcon from './svg-icons/DropperIcon'
+
+import { IconColorPicker } from '@tabler/icons-react'
 
 const hsvToRgb = (h, s, v) => {
     let c = v * s,
@@ -259,8 +260,8 @@ const ColorPicker = ({ value, onChange, isSmall }) => {
     const squareLeft = (wheelSize - squareSize) / 2
 
     return (
-        <div className="w-full max-w-xs mx-auto font-sans select-none gesture-allowed">
-            <div className="relative flex items-center justify-between m-[4px] gesture-allowed">
+        <div className="gesture-allowed mx-auto w-full max-w-xs font-sans select-none">
+            <div className="gesture-allowed relative m-[4px] flex items-center justify-between">
                 <input
                     type="text"
                     value={inputHex}
@@ -268,22 +269,22 @@ const ColorPicker = ({ value, onChange, isSmall }) => {
                     onFocus={handleHexFocus}
                     onBlur={handleHexBlur}
                     maxLength={7}
-                    className="font-bold text-base outline-none text-[8px] md:text-[12px] py-[4px] px-[8px] border-[#4B5563]/25 border-[1px] rounded-[4px] w-28 text-[#000000]"
+                    className="w-28 rounded-[4px] border-[1px] border-[#4B5563]/25 px-[8px] py-[4px] text-base text-[8px] font-bold text-[#000000] outline-none md:text-[12px]"
                     placeholder="#000000"
                 />
                 <button
                     type="button"
                     onClick={handleEyedropper}
-                    className=" cursor-pointer border-[#4B5563]/25 border-[1px] rounded-full p-[4px]"
+                    className="cursor-pointer rounded-full border-[1px] border-[#4B5563]/25 p-[4px]"
                     title="Pick color from screen"
                     tabIndex={0}
                 >
-                    <DropperIcon color="#000000" size={20} />
+                    <IconColorPicker color="#000000" size={20} stroke={1} />
                 </button>
             </div>
 
             <div
-                className="relative mx-auto gesture-allowed"
+                className="gesture-allowed relative mx-auto"
                 style={{ width: wheelSize, height: wheelSize }}
             >
                 <canvas
@@ -291,7 +292,7 @@ const ColorPicker = ({ value, onChange, isSmall }) => {
                     width={wheelSize}
                     height={wheelSize}
                     onMouseDown={handleWheelMouseDown}
-                    className="absolute left-0 top-0 block rounded-full gesture-allowed"
+                    className="gesture-allowed absolute top-0 left-0 block rounded-full"
                     style={{
                         pointerEvents: 'auto',
                         zIndex: 1,
@@ -304,7 +305,7 @@ const ColorPicker = ({ value, onChange, isSmall }) => {
                     width={squareSize}
                     height={squareSize}
                     onMouseDown={handleSquareMouseDown}
-                    className="absolute block rounded border border-white gesture-allowed"
+                    className="gesture-allowed absolute block rounded-sm border border-white"
                     style={{
                         left: squareLeft,
                         top: squareLeft,

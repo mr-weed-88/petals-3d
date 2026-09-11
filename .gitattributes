@@ -1,0 +1,4 @@
+# Shell scripts must keep LF endings or they will not run on macOS/Linux
+# after a clone on Windows.
+.githooks/* text eol=lf
+*.sh text eol=lf

@@ -3,7 +3,6 @@ import { useThree, useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
-import { canvasViewStore } from '../../hooks/useCanvasViewStore'
 
 import {
     smoothArray,
@@ -29,8 +28,6 @@ const DynamicBendGuidePlane = ({ onDrawingFinished }) => {
         bendPlaneGuide,
         pointerType,
     } = canvasDrawStore((state) => state)
-
-    const { setOrbitalLock } = canvasViewStore((state) => state)
 
     const MAX_POINTS = 50000
     const SMOOTH_PERCENTAGE = 75

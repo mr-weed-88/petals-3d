@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
+
+import { IconX } from '@tabler/icons-react'
 import { v4 as uuid } from 'uuid'
 
-import WrongButtonIcon from '../svg-icons/WrongButtonIcon'
-
 import { saveGroupToIndexDB } from '../../db/storage'
+import { notifyError } from '../../helpers/notify'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -58,12 +59,14 @@ const AddNewGroups = () => {
                 resetSelectedGroups()
                 handleClose()
             } else {
-                setError('Error while saving data')
+                notifyError(
+                    'Could not save the group. Your changes are not stored.'
+                )
                 handleClose()
             }
         } catch (error) {
             console.error(error)
-            setError(error.message)
+            notifyError(error.message)
         } finally {
             setLoading(false)
         }
@@ -71,51 +74,51 @@ const AddNewGroups = () => {
 
     return (
         <div>
-            <div className="relative z-10 funnel-sans-regular">
+            <div className="relative z-10 font-funnel font-normal">
                 <div className="fixed inset-0 bg-[#606060]/50 transition-opacity duration-200"></div>
 
                 <div className="fixed inset-0 z-10 overflow-y-auto text-[8px] md:text-[12px]">
                     <div className="flex h-full items-center justify-center text-center">
                         <div
-                            className={`bg-[#FFFFFF] relative overflow-hidden rounded-[8px] w-[320px] md:w-[420px] transition-all duration-200 ease-out transform
-                                ${
-                                    animateOut
-                                        ? 'animate-fade-out'
-                                        : 'animate-fade-in'
-                                }`}
+                            className={`relative w-[320px] transform overflow-hidden rounded-[8px] bg-[#FFFFFF] transition-all duration-200 ease-out md:w-[420px] ${
+                                animateOut
+                                    ? 'animate-fade-out'
+                                    : 'animate-fade-in'
+                            }`}
                         >
-                            <div className="flex justify-between items-center text-left text-[12px] md:text-[16px] p-[12px] m-[4px] border-b-[1px] border-[#D9D9D9] funnel-sans-semibold">
+                            <div className="m-[4px] flex items-center justify-between border-b-[1px] border-[#D9D9D9] p-[12px] text-left font-funnel text-[12px] font-semibold md:text-[16px]">
                                 <div className="text-[#000000]">
                                     Create new group
                                 </div>
                                 <div
                                     onClick={(e) => handleClose(e)}
-                                    className="p-[4px] rounded-[8px] cursor-pointer"
+                                    className="cursor-pointer rounded-[8px] p-[4px]"
                                 >
-                                    <WrongButtonIcon
+                                    <IconX
                                         color="#000000"
                                         size={16}
+                                        stroke={1}
                                     />
                                 </div>
                             </div>
                             <div className="mx-[20px] mt-[12px]">
                                 <div className="mt-[16px]">
-                                    <label className="text-left text-[12px] block funnel-sans-regular text-[#000000] mb-[8px]">
+                                    <label className="mb-[8px] block text-left font-funnel text-[12px] font-normal text-[#000000]">
                                         Name
                                     </label>
                                     <input
                                         onChange={(e) => handleNameChange(e)}
                                         type="text"
-                                        className="border-[1px] border-[#d9d9d9] text-[#000000] rounded-[8px] block w-full text-[12px] px-[12px] py-[8px] focus:outline-0 funnel-sans-semibold"
+                                        className="block w-full rounded-[8px] border-[1px] border-[#d9d9d9] px-[12px] py-[8px] font-funnel text-[12px] font-semibold text-[#000000] focus:outline-0"
                                         required
                                         disabled={loading}
                                     />
                                 </div>
                             </div>
-                            <div className="mt-[12px] flex justify-end items-center px-4 py-3 gap-[12px]">
+                            <div className="mt-[12px] flex items-center justify-end gap-[12px] px-4 py-3">
                                 <button
                                     onClick={(e) => handleClose(e)}
-                                    className="text-[#000000] border-[#d9d9d9] border-[1px] px-[12px] py-[4px] rounded-[8px] cursor-pointer "
+                                    className="cursor-pointer rounded-[8px] border-[1px] border-[#d9d9d9] px-[12px] py-[4px] text-[#000000]"
                                 >
                                     Cancel
                                 </button>
@@ -123,7 +126,7 @@ const AddNewGroups = () => {
                                 <button
                                     disabled={loading}
                                     onClick={(e) => handleCreateNewGroup(e)}
-                                    className="text-[#000000] px-[12px] py-[4px] rounded-[8px] border-[#5CA367] bg-[#5CA367]/25 border-[1px] cursor-pointer"
+                                    className="cursor-pointer rounded-[8px] border-[1px] border-[#5CA367] bg-[#5CA367]/25 px-[12px] py-[4px] text-[#000000]"
                                 >
                                     Create
                                 </button>

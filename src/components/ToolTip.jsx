@@ -40,17 +40,14 @@ const ToolTip = ({
 
     return (
         <div
-            className={`relative inline-block ${className} `}
+            className={`relative inline-block ${className}`}
             onMouseEnter={showTooltip}
             onMouseLeave={hideTooltip}
         >
             {children}
             {isVisible && text && (
                 <div
-                    className={`absolute z-[9999] p-[8px] text-[12px] font-medium text-white bg-[#000000]/75 rounded-[8px] whitespace-nowrap pointer-events-none transition-opacity duration-200 ${positionClasses[position]}`}
-                    style={{
-                        animation: 'tooltipFadeIn 0.2s ease-out',
-                    }}
+                    className={`pointer-events-none absolute z-[9999] animate-tooltip-fade-in rounded-[8px] bg-[#000000]/75 p-[8px] text-[12px] font-medium whitespace-nowrap text-white transition-opacity duration-200 ${positionClasses[position]}`}
                 >
                     {text}
                 </div>

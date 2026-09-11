@@ -1,18 +1,21 @@
 import React from 'react'
 
-import SunIcon from '../svg-icons/SunIcon'
-import AddIcon from '../svg-icons/AddIcon'
-import DeleteIcon from '../svg-icons/DeleteIcon'
-import RenameIcon from '../svg-icons/RenameIcon'
-import EyeOpenIcon from '../svg-icons/EyeOpenIcon'
-import OpacityIcon from '../svg-icons/OpacityIcon'
-import CorrectIcon from '../svg-icons/CorrectIcon'
-import GroupingIcon from '../svg-icons/GroupingIcon'
-import EyeCloseIcon from '../svg-icons/EyeCloseIcon'
-import SceneOptionIcon from '../svg-icons/SceneOptionIcon'
+import {
+    IconAdjustments,
+    IconBulb,
+    IconCheck,
+    IconCursorText,
+    IconDropletHalf2,
+    IconEye,
+    IconEyeOff,
+    IconPlus,
+    IconStack2,
+    IconTrash,
+} from '@tabler/icons-react'
 
 import ColorPicker from '../ColorPicker'
 
+import { saveGroupToIndexDB } from '../../db/storage'
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 
@@ -127,19 +130,20 @@ const SceneOptionsPanel = ({ isSmall }) => {
     return (
         <>
             <div>
-                <div className="absolute w-[180px] md:w-[240px] top-[72px] right-[12px] z-5 p-[4px] rounded-[8px] bg-[#FFFFFF] border-[1px] border-[#4B5563]/25 drop-shadow-xl">
-                    <div className="flex justify-around mb-[8px]">
+                <div className="absolute top-[72px] right-[12px] z-5 w-[180px] rounded-[8px] border-[1px] border-[#4B5563]/25 bg-[#FFFFFF] p-[4px] drop-shadow-xl md:w-[240px]">
+                    <div className="mb-[8px] flex justify-around">
                         <div
                             onClick={(e) => handleSceneActiveOptions('groups')}
                             className={`${
                                 groupOptions
                                     ? 'border-[#00A36C]'
                                     : 'border-[#121212]'
-                            } font-bold p-[8px] cursor-pointer border-b-[2px] rounded-t-[4px]`}
+                            } cursor-pointer rounded-t-[4px] border-b-[2px] p-[8px] font-bold`}
                         >
-                            <GroupingIcon
+                            <IconStack2
                                 color="#000000"
                                 size={isSmall ? 12 : 20}
+                                stroke={1}
                             />
                         </div>
 
@@ -149,62 +153,69 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                 renderOptions
                                     ? 'border-[#00A36C]'
                                     : 'border-[#121212]'
-                            }  font-bold p-[8px] cursor-pointer border-b-[2px] rounded-t-[4px]`}
+                            } cursor-pointer rounded-t-[4px] border-b-[2px] p-[8px] font-bold`}
                         >
-                            <SceneOptionIcon
+                            <IconAdjustments
                                 color="#000000"
                                 size={isSmall ? 12 : 20}
+                                stroke={1}
                             />
                         </div>
                     </div>
 
                     {sceneOptions && groupOptions && (
-                        <div className="flex justify-center mb-[8px]">
+                        <div className="mb-[8px] flex justify-center">
                             <div
                                 onClick={(e) => handleGroupOperation('add')}
-                                className="hover:bg-[#5CA367]/25 p-[8px] cursor-pointer rounded-[4px]"
+                                className="cursor-pointer rounded-[4px] p-[8px] hover:bg-[#5CA367]/25"
                             >
-                                <AddIcon
+                                <IconPlus
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             </div>
                             <div
                                 onClick={(e) => handleGroupOperation('rename')}
-                                className="hover:bg-[#5CA367]/25 p-[8px] cursor-pointer rounded-[4px]"
+                                className="cursor-pointer rounded-[4px] p-[8px] hover:bg-[#5CA367]/25"
                             >
-                                <RenameIcon
+                                <IconCursorText
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             </div>
                             <div
                                 onClick={(e) => handleGroupOperation('delete')}
-                                className="hover:bg-[#5CA367]/25 p-[8px] cursor-pointer rounded-[4px]"
+                                className="cursor-pointer rounded-[4px] p-[8px] hover:bg-[#5CA367]/25"
                             >
-                                <DeleteIcon
+                                <IconTrash
                                     color="#000000"
                                     size={isSmall ? 12 : 20}
+                                    stroke={1}
                                 />
                             </div>
                         </div>
                     )}
 
-                    <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                    {/* `custom-scrollbar` carries no styles. Editor.jsx finds
+                        it with closest() to exempt this list from the
+                        page-wide gesture and scroll suppression. */}
+                    <div className="custom-scrollbar max-h-[500px] touch-pan-y overflow-y-auto overscroll-contain contain-[layout_style_paint] [-webkit-overflow-scrolling:touch]">
                         {sceneOptions &&
                             groupOptions &&
                             groupData.map((data, key) => {
                                 return (
                                     <div
                                         key={key}
-                                        className="text-[8px] md:text-[12px] z-5 m-[4px] flex flex-col rounded-[4px] text-[#000000] funnel-sans-regular"
+                                        className="z-5 m-[4px] flex flex-col rounded-[4px] font-funnel text-[8px] font-normal text-[#000000] md:text-[12px]"
                                     >
                                         <div
                                             className={`${
                                                 data.active
                                                     ? 'bg-[#5CA367]'
                                                     : 'bg-[#FFFFFF]'
-                                            } flex cursor-pointer justify-between items-center rounded-[4px] px-[8px]`}
+                                            } flex cursor-pointer items-center justify-between rounded-[4px] px-[8px]`}
                                         >
                                             <label className="cursor-pointer">
                                                 <input
@@ -226,11 +237,12 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                                     }
                                                 />
                                                 <div
-                                                    className={`w-[12px] h-[12px] md:w-[16px] md:h-[16px] rounded-[20px] bg-[#ffffff] border-[1px] border-[#4B5563]/25 peer-checked:bg-[#005eff] flex items-center justify-center`}
+                                                    className={`flex size-[12px] items-center justify-center rounded-[20px] border-[1px] border-[#4B5563]/25 bg-[#ffffff] peer-checked:bg-[#005eff] md:size-[16px]`}
                                                 >
-                                                    <CorrectIcon
+                                                    <IconCheck
                                                         size={isSmall ? 8 : 12}
                                                         color="#FFFFFF"
+                                                        stroke={1}
                                                     />
                                                 </div>
                                             </label>
@@ -238,7 +250,7 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                                 onClick={(e) =>
                                                     handleActiveGroup(data)
                                                 }
-                                                className="p-[4px] w-full mx-[8px]"
+                                                className="mx-[8px] w-full p-[4px]"
                                             >
                                                 {data.name.length > 13
                                                     ? `${data.name.slice(
@@ -252,18 +264,20 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                                 onClick={(e) =>
                                                     handleGroupVisibility(data)
                                                 }
-                                                className="flex justify-between gap-[8px] items-center p-[4px] rounded-[4px]"
+                                                className="flex items-center justify-between gap-[8px] rounded-[4px] p-[4px]"
                                             >
                                                 {data.visible && (
-                                                    <EyeOpenIcon
+                                                    <IconEye
                                                         color="#000000"
                                                         size={isSmall ? 12 : 20}
+                                                        stroke={1}
                                                     />
                                                 )}
                                                 {!data.visible && (
-                                                    <EyeCloseIcon
+                                                    <IconEyeOff
                                                         color="#000000"
                                                         size={isSmall ? 12 : 20}
+                                                        stroke={1}
                                                     />
                                                 )}
                                             </div>
@@ -274,20 +288,22 @@ const SceneOptionsPanel = ({ isSmall }) => {
                     </div>
 
                     {sceneOptions && renderOptions && (
-                        <div className="funnel-sans-regular z-5 items-center rounded-[8px] w-full text-[#000000] bg-[#FFFFFF]">
-                            <div className="flex justify-between items-center px-[12px] border-b-[1px] border-[#4B5563]/25">
-                                <div className="flex justify-between items-center">
-                                    <div className="font-bold p-[8px] cursor-pointer flex gap-[12px]">
-                                        <SunIcon
+                        <div className="z-5 w-full items-center rounded-[8px] bg-[#FFFFFF] font-funnel font-normal text-[#000000]">
+                            <div className="flex items-center justify-between border-b-[1px] border-[#4B5563]/25 px-[12px]">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex cursor-pointer gap-[12px] p-[8px] font-bold">
+                                        <IconBulb
                                             color="#000000"
                                             size={isSmall ? 12 : 20}
+                                            stroke={1}
                                         />
                                     </div>
 
-                                    <div className="flex flex-col m-[4px] gesture-allowed">
-                                        <div className="range-container">
-                                            <div className="range-wrapper">
+                                    <div className="gesture-allowed m-[4px] flex flex-col">
+                                        <div className="flex size-full items-center justify-start gap-[15px] bg-[#FFFFFF]">
+                                            <div className="flex w-full items-center">
                                                 <input
+                                                    className="h-[5px] cursor-pointer appearance-none rounded-[50px] bg-[#A7A7A7] bg-[linear-gradient(#5CA367,#5CA367)] bg-no-repeat [&::-moz-range-thumb]:size-[15px] [&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:bg-[#D5D4D8] [&::-webkit-slider-thumb]:size-[15px] [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[#2C2C2C]"
                                                     onChange={(e) =>
                                                         handleLightIntensitySlider(
                                                             e
@@ -312,7 +328,7 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="font-bold p-[4px] cursor-pointer flex text-[8px] md:text-[12px]">
+                                <div className="flex cursor-pointer p-[4px] text-[8px] font-bold md:text-[12px]">
                                     {lightIntensity}
                                 </div>
                             </div>
@@ -326,16 +342,18 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                         onClick={(e) =>
                                             setPostProcess(!postProcess)
                                         }
-                                        className="m-[12px] flex items-center bg-[#16b826] rounded-[12px]"
+                                        className="m-[12px] flex items-center rounded-[12px] bg-[#16b826]"
                                     >
-                                        <div className="flex items-center bg-[#16b826] rounded-[12px] transition-all duration-200 ease-out transform animate-fade-in">
-                                            <OpacityIcon
+                                        <div className="flex transform animate-fade-in items-center rounded-[12px] bg-[#16b826] transition-all duration-200 ease-out">
+                                            <IconDropletHalf2
                                                 color="#16b826"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
-                                            <OpacityIcon
+                                            <IconDropletHalf2
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </div>
                                     </div>
@@ -345,16 +363,18 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                         onClick={(e) =>
                                             setPostProcess(!postProcess)
                                         }
-                                        className="m-[12px] flex items-center bg-[#16b826] rounded-[12px]"
+                                        className="m-[12px] flex items-center rounded-[12px] bg-[#16b826]"
                                     >
-                                        <div className="flex items-center bg-[#A9A9A9] rounded-[12px] transition-all duration-200 ease-out transform animate-fade-in">
-                                            <OpacityIcon
+                                        <div className="flex transform animate-fade-in items-center rounded-[12px] bg-[#A9A9A9] transition-all duration-200 ease-out">
+                                            <IconDropletHalf2
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
-                                            <OpacityIcon
+                                            <IconDropletHalf2
                                                 color="#A9A9A9"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </div>
                                     </div>
@@ -372,16 +392,18 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                                 !sequentialLoading
                                             )
                                         }
-                                        className="m-[12px] flex items-center bg-[#16b826] rounded-[12px]"
+                                        className="m-[12px] flex items-center rounded-[12px] bg-[#16b826]"
                                     >
-                                        <div className="flex items-center bg-[#16b826] rounded-[12px] transition-all duration-200 ease-out transform animate-fade-in">
-                                            <OpacityIcon
+                                        <div className="flex transform animate-fade-in items-center rounded-[12px] bg-[#16b826] transition-all duration-200 ease-out">
+                                            <IconDropletHalf2
                                                 color="#16b826"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
-                                            <OpacityIcon
+                                            <IconDropletHalf2
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </div>
                                     </div>
@@ -394,23 +416,25 @@ const SceneOptionsPanel = ({ isSmall }) => {
                                                 !sequentialLoading
                                             )
                                         }
-                                        className="m-[12px] flex-col items-center bg-[#16b826] rounded-[12px]"
+                                        className="m-[12px] flex-col items-center rounded-[12px] bg-[#16b826]"
                                     >
-                                        <div className="flex items-center bg-[#A9A9A9] rounded-[12px] transition-all duration-200 ease-out transform animate-fade-in">
-                                            <OpacityIcon
+                                        <div className="flex transform animate-fade-in items-center rounded-[12px] bg-[#A9A9A9] transition-all duration-200 ease-out">
+                                            <IconDropletHalf2
                                                 color="#000000"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
-                                            <OpacityIcon
+                                            <IconDropletHalf2
                                                 color="#A9A9A9"
                                                 size={isSmall ? 12 : 20}
+                                                stroke={1}
                                             />
                                         </div>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="border-t-[1px] border-[#4B5563]/25 gesture-allowed">
+                            <div className="gesture-allowed border-t-[1px] border-[#4B5563]/25">
                                 <ColorPicker
                                     value={canvasBackgroundColor}
                                     onChange={setCanvasBackgroundColor}
