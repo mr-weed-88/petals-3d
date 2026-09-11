@@ -14,7 +14,8 @@
         "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json,md}\"",
         "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{ts,js,json,md}\"",
         "prepare": "git config core.hooksPath .githooks || exit 0",
-        "typecheck": "tsc --noEmit"
+        "typecheck": "tsc --noEmit",
+        "banner": "node scripts/banner.js"
     },
     "lint-staged": {
         "*.{ts,tsx}": [
