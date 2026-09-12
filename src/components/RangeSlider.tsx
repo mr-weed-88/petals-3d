@@ -1,10 +1,7 @@
 import type { ChangeEvent } from 'react'
 
-/**
- * Thumb diameter. The browser insets a native thumb by half its width at each
- * end so it never overhangs, and the fill must follow the same rule or the two
- * drift apart at the extremes.
- */
+/** Thumb diameter. The browser insets a native thumb by half its width at each
+    end, and the fill must follow or the two drift apart at the extremes. */
 const THUMB = 14
 
 export interface RangeSliderProps {
@@ -27,9 +24,8 @@ function format(value: number, step: number): string {
 /**
  * The native control is present but invisible: it keeps keyboard support,
  * assistive-technology semantics and click-to-jump, while every visible pixel
- * is an ordinary div. `input[type=range]` is styled through vendor
- * pseudo-elements that differ per engine, so painting the track ourselves is
- * the only way it looks the same on every OS.
+ * is an ordinary div. Vendor pseudo-elements differ per engine, so painting
+ * the track is the only way it looks the same on every OS.
  */
 const RangeSlider = ({
     name,
@@ -48,12 +44,8 @@ const RangeSlider = ({
     const ratio =
         span === 0 ? 0 : Math.min(1, Math.max(0, (value - min) / span))
 
-    /*
-     * Where the thumb centre sits, accounting for the inset above. The fill
-     * width and the thumb offset are both this, so the fill always ends under
-     * the thumb. Derived from the value, replacing the background-size string
-     * each caller used to keep in its store beside it.
-     */
+    // Where the thumb centre sits, allowing for the inset above. The fill
+    // width and the thumb offset are both this, so the fill ends under it.
     const centre = `calc(${ratio * 100}% + ${(0.5 - ratio) * THUMB}px)`
 
     // Always full width; the row decides how much space it gets.
@@ -87,7 +79,7 @@ const RangeSlider = ({
     if (compact) return track
 
     // One padded column owns the spacing, so label, track and readout share a
-    // left edge whatever padding the surrounding panel uses.
+    // left edge whatever the surrounding panel does.
     return (
         <div className="flex w-full flex-col gap-[12px] p-[8px] font-funnel">
             <div className="text-left text-[8px] font-normal text-ink-muted md:text-[12px]">

@@ -39,13 +39,12 @@ const rotated = CORNERS.map(() => new THREE.Vector3())
 const faceNormal = new THREE.Vector3()
 
 /**
- * The orientation cube, projected orthographically.
+ * The orientation cube, projected orthographically. A sphere gives no clue
+ * which way it has turned, so the trackball is a cube.
  *
- * A sphere gives no clue which way it has turned, so the trackball is drawn as
- * a cube instead. Faces are returned in a fixed order rather than sorted by
- * depth: the visible faces of a convex solid never overlap under orthographic
- * projection, so hiding the back ones is enough and the DOM order can stay put.
- * With no fill there is nothing to shade, so only the outlines are produced.
+ * Faces come back in a fixed order rather than sorted by depth: under
+ * orthographic projection the visible faces of a convex solid never overlap,
+ * so hiding the back ones is enough and the DOM order can stay put.
  */
 export function cubeFaces(
     quaternion: THREE.Quaternion,

@@ -54,9 +54,8 @@ function placeBubble(rect: DOMRect, position: TooltipPosition): BubbleStyle {
 
 /**
  * Not themed on purpose: always black on white, so it never blends into the
- * panel behind it. It portals to <body> because the panels create their own
- * stacking contexts, and a bubble left inside one can be covered by the next
- * panel however high its z-index.
+ * panel behind it. Portals to <body>, because panels create their own stacking
+ * contexts and a bubble inside one can be covered whatever its z-index.
  */
 const ToolTip = ({
     children,
@@ -99,14 +98,10 @@ const ToolTip = ({
             {style &&
                 text &&
                 createPortal(
-                    /*
-                     * Two elements, because each needs its own transform and
-                     * an element only gets one. The outer carries the
-                     * translate that anchors the bubble; the inner runs the
-                     * scale animation. Shared, the animation overrode the
-                     * inline translate and the bubble only jumped into place
-                     * once the animation finished.
-                     */
+                    /* Two elements, because an element gets one transform: the
+                       outer anchors the bubble, the inner runs the scale
+                       animation. Shared, the animation wins and the bubble
+                       jumps into place only once it finishes. */
                     <div
                         style={{
                             position: 'fixed',

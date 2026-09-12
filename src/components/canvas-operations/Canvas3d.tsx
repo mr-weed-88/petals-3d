@@ -5,7 +5,6 @@ import {
     OrbitControls,
     PerspectiveCamera,
     OrthographicCamera,
-    Stats,
 } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 
@@ -20,14 +19,8 @@ import CanvasOperations from './CanvasOperations'
 
 type OrbitControlsRef = ComponentRef<typeof OrbitControls>
 
-/** The stats panel's own size, which the wrapper must match to centre it. */
-const STATS_WIDTH = 80
-const STATS_HEIGHT = 48
-
 /** The R3F canvas: camera, lights, grids, post-processing and the tool layer. */
 const Canvas3d = () => {
-    const statsParent = useRef<HTMLDivElement>(null)
-
     const {
         orbitalLock,
         isOrthographic,
@@ -157,21 +150,6 @@ const Canvas3d = () => {
 
     return (
         <>
-            {/*
-             * stats.js positions its panel with an inline fixed position that
-             * no class can override. A wrapper carrying a transform becomes
-             * the containing block for fixed children, so the panel lands here
-             * rather than in the viewport corner. The wrapper needs a real
-             * size, or the centring translate has nothing to work from.
-             */}
-            {import.meta.env.DEV && (
-                <div
-                    ref={statsParent}
-                    className="fixed bottom-[12px] left-1/2 z-10 -translate-x-1/2"
-                    style={{ width: STATS_WIDTH, height: STATS_HEIGHT }}
-                />
-            )}
-
             <Canvas
                 className="cursor-[var(--cursor-draw)]"
                 style={{ backgroundColor: canvasBackgroundColor }}
@@ -264,17 +242,6 @@ const Canvas3d = () => {
                 )}
 
                 {postProcess && <SceneComposer />}
-
-                {/*
-                 * The cast covers a stale type in drei: its `parent` is
-                 * declared non-nullable, but React 19 types every ref
-                 * initialised to null as nullable.
-                 */}
-                {import.meta.env.DEV && (
-                    <Stats
-                        parent={statsParent as React.RefObject<HTMLElement>}
-                    />
-                )}
             </Canvas>
         </>
     )

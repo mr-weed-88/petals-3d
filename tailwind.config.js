@@ -1,8 +1,6 @@
 /*
- * Tailwind v4 does not pick this file up on its own. It is loaded by the
- * `@config` directive at the top of src/App.css.
- *
- * It must be ESM (`export default`, not `module.exports`) because
+ * Tailwind v4 does not pick this file up on its own: it is loaded by the
+ * `@config` directive at the top of src/App.css. It must be ESM, because
  * package.json declares "type": "module".
  */
 export default {
@@ -16,14 +14,11 @@ export default {
         },
         extend: {
             /*
-             * Semantic colours, backed by the custom properties declared in
-             * src/App.css and flipped by the `.dark` class on <html>.
-             *
-             * Because the value is a variable, a single class covers both
-             * themes: `bg-surface` is white in light and near-black in dark,
-             * with no `dark:` variant anywhere. Opacity modifiers still work
-             * (`border-line/25`), since Tailwind v4 applies them with
-             * color-mix rather than by rewriting the channels.
+             * Semantic colours, backed by the custom properties in src/App.css
+             * and flipped by the `.dark` class on <html>. Because the value is
+             * a variable, one class covers both themes and no `dark:` variant
+             * is needed. Opacity modifiers still work (`border-line/25`):
+             * Tailwind v4 applies them with color-mix.
              */
             colors: {
                 surface: 'var(--c-surface)',
@@ -85,17 +80,15 @@ export default {
             },
 
             animation: {
-                // react-toastify is handed these class names as plain strings
-                // in src/config/objectsConfig.js, so they must keep exactly
-                // these names.
+                // react-toastify is handed these names as plain strings in
+                // src/config/objectsConfig.ts, so they cannot be renamed.
                 'fade-in': 'fade-in 0.2s ease-out forwards',
                 'fade-out': 'fade-out 0.2s ease-in forwards',
                 'tooltip-fade-in': 'tooltip-fade-in 0.2s ease-out',
 
-                // Decelerating curve, so the modal arrives fast and settles
-                // softly. `backwards` holds the from-state during the frame
-                // before the animation starts, which is what stops the modal
-                // flashing at full size on mount.
+                // `backwards` holds the from-state during the frame before the
+                // animation starts, which stops the modal flashing at full
+                // size on mount.
                 'modal-in':
                     'modal-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) backwards',
                 'overlay-in': 'overlay-in 0.2s ease-out backwards',

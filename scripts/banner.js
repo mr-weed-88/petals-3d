@@ -1,29 +1,20 @@
 #!/usr/bin/env node
 /**
- * The Petals3D dev banner.
+ * The Petals3D dev banner. Exported as a Vite plugin so it is reprinted on
+ * every dev-server start and restart, and runs standalone with
+ * `node scripts/banner.js`.
  *
- * Exports a Vite plugin so the banner is reprinted every time the dev server
- * starts *or* restarts. Vite clears the screen on restart, which would wipe
- * a banner printed once before `vite` was spawned.
- *
- * Also runs standalone: `node scripts/banner.js`.
- *
- * Cosmetic only, dependency-free, and it never throws: a decorative banner
- * must not be able to stop the dev server.
+ * Cosmetic, dependency-free, and it never throws: a banner must not be able
+ * to stop the dev server.
  */
 
 import { readFileSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join } from 'node:path'
 
-/* ------------------------------------------------------------------ *
- * Colour
- *
- * Truecolor where the terminal advertises it, 256-colour otherwise, and
- * nothing at all when piped to a file or when NO_COLOR is set. Resolved on
- * every call rather than at import, because the plugin prints long after
- * this module is first loaded.
- * ------------------------------------------------------------------ */
+/* Truecolor where the terminal advertises it, 256-colour otherwise, nothing
+   when piped or when NO_COLOR is set. Resolved on every call, because the
+   plugin prints long after this module loads. */
 
 const useColor = () =>
     Boolean(process.stdout.isTTY) &&
@@ -47,18 +38,9 @@ const rgb = ([r, g, b], fallback256) => {
         : `\x1b[38;5;${fallback256}m`
 }
 
-/* ------------------------------------------------------------------ *
- * Artwork
- *
- * Braille block characters (U+2800..U+28FF), padded with U+2800 BRAILLE
- * PATTERN BLANK rather than ordinary spaces. Do not "tidy" the whitespace:
- * those blanks hold the shape together, and an editor that trims trailing
- * space will break the drawing.
- *
- * This is a half-scale rendering of the original 49x21 drawing. Each glyph
- * carries a 2x4 dot grid, so the full-size art was decoded to a dot bitmap,
- * downsampled 2x, and re-encoded.
- * ------------------------------------------------------------------ */
+/* Braille block characters, padded with U+2800 BRAILLE PATTERN BLANK rather
+   than spaces. Do not tidy the whitespace: those blanks hold the shape
+   together, and an editor that trims trailing space breaks the drawing. */
 
 const BRAILLE_BLANK = '⠀'
 
@@ -180,27 +162,18 @@ export function printBanner() {
     }
 }
 
-/**
- * Survives a config reload, which re-imports this module inside the same
- * process, so the plugin can tell a cold start from a restart.
- */
+/** Survives a config reload, which re-imports this module in the same
+    process, so the plugin can tell a cold start from a restart. */
 const state = (globalThis.__petals3dBanner ??= { started: false })
 
 /**
- * Vite plugin. Prints the banner on a cold start and again on every restart.
+ * The two cases need different hooks. On a cold start Vite clears the screen
+ * and then calls `printUrls`, so the banner only survives inside a wrapped
+ * `printUrls`. On a restart it neither clears nor calls `printUrls`, so the
+ * banner has to print directly from `configureServer`.
  *
- * The two cases need different hooks:
- *
- * - Cold start: Vite clears the screen, logs its version, then calls
- *   `printUrls`. Anything printed earlier is wiped, so the only place the
- *   banner survives is inside a wrapped `printUrls`.
- *
- * - Restart (editing vite.config.ts): Vite logs "server restarted" and does
- *   *not* clear the screen or call `printUrls` again, so the banner has to
- *   be printed directly from `configureServer`.
- *
- * HMR updates on a normal file save deliberately do not reprint: a 22-line
- * banner on every keystroke-to-save would bury Vite's own output.
+ * An ordinary file save does not reprint: a 22-line banner on every save
+ * would bury Vite's own output.
  */
 export function bannerPlugin() {
     return {

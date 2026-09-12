@@ -1,10 +1,17 @@
-import { useRef, useState, useEffect, useMemo } from 'react'
+import { useRef, useState, useEffect, useMemo, useCallback } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
 import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveLines, saveSceneMeta } from '../../db/storage'
+import {
+    cloneLineRecord,
+    findLineRecord,
+    snapshotTransform,
+    type TransformSnapshot,
+} from '../../helpers/records'
+import { historyBusy, pushHistory } from '../../helpers/historyCapture'
 import { notifySuccess } from '../../helpers/notify'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -71,6 +78,9 @@ const TransformLine = () => {
 
     const { transformStyle } = editorPrefsStore((state) => state)
     const setTarget = transformTargetStore((state) => state.setTarget)
+    const setReleaseSelection = transformTargetStore(
+        (state) => state.setReleaseSelection
+    )
 
     const transformRef = useRef<TransformControls | null>(null)
     const dummyTarget = useRef(new THREE.Group())
@@ -112,10 +122,22 @@ const TransformLine = () => {
         object.scale.copy(tempScale)
     }
 
+    /** Captured on pointer-down, since the records are rewritten in place. */
+    const transformBefore = useRef<TransformSnapshot[]>([])
+
+    const captureTransformBefore = () => {
+        transformBefore.current = dummyTarget.current.children
+            .filter(isLineMesh)
+            .map((mesh) => snapshotTransform(mesh.userData))
+    }
+
     const updateLineWorldPoints = async () => {
         const worldPosition = new THREE.Vector3()
         const worldQuaternion = new THREE.Quaternion()
         const worldScale = new THREE.Vector3()
+
+        // Only the records that actually moved are written back.
+        const moved: LineRecord[] = []
 
         dummyTarget.current.children.forEach((lineObj) => {
             if (!isLineMesh(lineObj)) return
@@ -135,9 +157,9 @@ const TransformLine = () => {
             lineObj.getWorldQuaternion(worldQuaternion)
             lineObj.getWorldScale(worldScale)
 
-            const lineUuid = lineObj.userData.uuid
-            const targetLineData = activeGroup?.objects.find(
-                (obj) => obj.uuid === lineUuid
+            const targetLineData = findLineRecord(
+                canvasRenderStore.getState().groupData,
+                lineObj.userData.uuid
             )
 
             if (targetLineData) {
@@ -145,11 +167,24 @@ const TransformLine = () => {
                 targetLineData.rotation = worldQuaternion.clone()
                 targetLineData.scale = worldScale.clone()
                 targetLineData.loft_points = worldPoints
+                moved.push(targetLineData)
             }
         })
 
         setGroupData([...canvasRenderStore.getState().groupData])
-        await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+        await saveLines(moved)
+
+        const before = transformBefore.current
+        if (before.length > 0 && moved.length > 0) {
+            pushHistory('Transform', [
+                {
+                    kind: 'lines-transformed',
+                    before,
+                    after: moved.map(snapshotTransform),
+                },
+            ])
+            transformBefore.current = []
+        }
     }
 
     useEffect(() => {
@@ -196,6 +231,7 @@ const TransformLine = () => {
 
         const onDragStart = () => {
             isTransformDragging.current = true
+            captureTransformBefore()
         }
 
         const onDragEnd = () => {
@@ -281,11 +317,9 @@ const TransformLine = () => {
         })
     }, [transformMode])
 
-    /*
-     * The legacy gizmo only attaches in legacy mode. Selection, grouping and
-     * commit are untouched either way, which is what lets the joystick be
-     * swapped in without this file knowing anything about it.
-     */
+    // The legacy gizmo only attaches in legacy mode. Selection, grouping and
+    // commit are the same either way, which is what lets the joystick be
+    // swapped in without this file knowing about it.
     useEffect(() => {
         const controls = transformRef.current
         if (!controls) return
@@ -301,10 +335,8 @@ const TransformLine = () => {
         }
     }, [attachedGizmos, scene, transformStyle])
 
-    /*
-     * Publishes the proxy Group for the joystick, which lives outside the
-     * canvas and cannot reach into the scene graph itself.
-     */
+    // Publishes the proxy Group for the joystick, which lives outside the
+    // canvas and cannot reach into the scene graph.
     useEffect(() => {
         if (!attachedGizmos || transformStyle !== 'joystick') {
             setTarget(null)
@@ -313,6 +345,7 @@ const TransformLine = () => {
 
         setTarget({
             object: dummyTarget.current,
+            beginDrag: captureTransformBefore,
             commit: () => void updateLineWorldPoints(),
         })
 
@@ -327,6 +360,51 @@ const TransformLine = () => {
     useEffect(() => {
         if (transformRef.current) transformRef.current.setSpace(axisMode)
     }, [axisMode])
+
+    /**
+     * Hands the selection back to the scene: every mesh regains its world
+     * transform as its own, the gizmo detaches and the proxy group returns to
+     * identity. Undo calls this first, because applying a stored world
+     * transform to a still-parented mesh composes the two and scatters
+     * the lines.
+     */
+    const releaseSelection = useCallback(() => {
+        const dummy = dummyTarget.current
+        const controls = transformRef.current
+
+        if (controls) {
+            controls.detach()
+            const helper = controls.getHelper()
+            if (scene.children.includes(helper)) scene.remove(helper)
+        }
+
+        // Must be current before it is folded into each child, or they
+        // inherit a stale transform.
+        dummy.updateMatrixWorld(true)
+
+        for (const child of [...dummy.children]) {
+            child.updateMatrixWorld(true)
+            child.applyMatrix4(dummy.matrixWorld)
+            dummy.remove(child)
+            scene.add(child)
+        }
+
+        if (scene.children.includes(dummy)) scene.remove(dummy)
+
+        dummy.position.set(0, 0, 0)
+        dummy.quaternion.identity()
+        dummy.scale.set(1, 1, 1)
+        dummy.updateMatrixWorld(true)
+
+        highlighted.current.clear()
+        setAttachedGizmos(false)
+        setTarget(null)
+    }, [scene, setTarget])
+
+    useEffect(() => {
+        setReleaseSelection(releaseSelection)
+        return () => setReleaseSelection(null)
+    }, [releaseSelection, setReleaseSelection])
 
     const resetDummyTarget = () => {
         const dummy = dummyTarget.current
@@ -359,6 +437,7 @@ const TransformLine = () => {
 
     useEffect(() => {
         const onPointerDownWindow = (event: PointerEvent) => {
+            if (historyBusy()) return
             if (event.pointerType !== pointerType) return
 
             const target = event.target
@@ -461,6 +540,9 @@ const TransformLine = () => {
     useEffect(() => {
         if (dummyTarget.current.children.length === 0) return
 
+        const recoloured: LineRecord[] = []
+        const previousColours: string[] = []
+
         dummyTarget.current.children.forEach((obj) => {
             if (!isLineMesh(obj)) return
             if (obj.userData.group_id !== activeGroup?.uuid) return
@@ -468,7 +550,9 @@ const TransformLine = () => {
             const type = obj.userData.type
             if (type !== 'LINE' && type !== 'MERGED_LINE') return
 
+            previousColours.push(obj.userData.color)
             obj.userData.color = lineColor
+            recoloured.push(obj.userData)
             forEachMaterial(obj, (material) => {
                 if ('color' in material) {
                     ;(material as THREE.MeshBasicMaterial).color.set(lineColor)
@@ -479,7 +563,17 @@ const TransformLine = () => {
 
         if (highlighted.current.size >= 1) {
             setGroupData([...canvasRenderStore.getState().groupData])
-            void saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+            // A colour change alters no membership, so the index is untouched.
+            void saveLines(recoloured)
+
+            pushHistory('Recolour', [
+                {
+                    kind: 'lines-recoloured',
+                    uuids: recoloured.map((line) => line.uuid),
+                    before: previousColours,
+                    after: lineColor,
+                },
+            ])
         }
 
         invalidate()
@@ -536,7 +630,9 @@ const TransformLine = () => {
                 if (positionAttribute) positionAttribute.needsUpdate = true
             }
 
-            clone.userData = { ...original.userData }
+            // A deep copy: a spread would share the point arrays, so
+            // transforming the copy would rewrite the source stroke.
+            clone.userData = cloneLineRecord(original.userData as LineRecord)
             clone.userData.uuid = clone.uuid
 
             if (isLineMesh(clone)) clonedRecords.push(clone.userData)
@@ -560,7 +656,19 @@ const TransformLine = () => {
         activeGroup?.objects.push(...clonedRecords)
 
         setGroupData([...canvasRenderStore.getState().groupData])
-        void saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+
+        // Records first, then the index that references them.
+        void saveLines(clonedRecords).then(() =>
+            saveSceneMeta(canvasRenderStore.getState().groupData)
+        )
+
+        pushHistory('Duplicate', [
+            {
+                kind: 'lines-added',
+                groupId: activeGroup?.uuid ?? '',
+                lines: clonedRecords.map(cloneLineRecord),
+            },
+        ])
 
         notifySuccess(`${clones.length} curves copied!`)
         // eslint-disable-next-line react-hooks/exhaustive-deps

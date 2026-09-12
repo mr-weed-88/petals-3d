@@ -15,13 +15,9 @@ const WORLD_AXES = {
 } as const
 
 /**
- * Lives inside the canvas and publishes where each world axis points on
- * screen, so the joystick can turn with the scene from outside it.
- *
- * Only the camera's orientation is used. Direction is independent of field of
- * view, of distance, and of whether the camera is perspective or orthographic,
- * which is why this needs none of the pixel-to-world conversion that stepped
- * dragging was introduced to avoid.
+ * Publishes where each world axis points on screen, so the joystick can turn
+ * with the scene from outside the canvas. Only the camera's orientation is
+ * used: direction is independent of field of view, distance, and projection.
  */
 const JoystickCameraBridge = () => {
     const { camera } = useThree()
@@ -46,12 +42,9 @@ const JoystickCameraBridge = () => {
                 .copy(WORLD_AXES[axis])
                 .applyQuaternion(inverse.current)
 
-            /*
-             * Screen Y grows downward, hence the negation. `depth` is how much
-             * of the axis survives the projection: 1 when it lies across the
-             * view, 0 when it points straight at the camera and the handle
-             * would collapse to a point.
-             */
+            /* Screen Y grows downward, hence the negation. `depth` is how much
+               of the axis survives the projection: 1 across the view, 0 when it
+               points at the camera and the handle collapses to a point. */
             next[axis] = {
                 angle: (Math.atan2(-view.y, view.x) * 180) / Math.PI,
                 depth: Math.hypot(view.x, view.y),

@@ -1,433 +1,693 @@
-# Petals3D - Architecture & System Documentation
+# Petals3D Architecture
 
-> Reference document for the petals-3d codebase, written from a full read of `src/` at commit `2459e6d`.
-> Scope: what the project is, how it works, what exists today, and where the gaps are.
+Everything you need to work on this codebase, whether or not you have touched 3D
+before. No graphics knowledge is assumed. Section 2 defines every 3D term used
+in the rest of the document.
 
----
-
-## 1. What this is
-
-Petals3D is a **browser-based 3D drawing tool**. The user draws freehand strokes with a mouse, stylus, or finger, and those strokes become real 3D geometry in a scene they can orbit, transform, group, and export.
-
-It is a solo project, roughly a year old, released open-source in `2171a67`. The reference product is [feather.art](https://www.feather.art/) - a team-built tool in the same category. The stated direction is to make Petals3D as immediately usable in a browser as Excalidraw: open a URL, start drawing, no account, no install, work persists locally.
-
-**The hard problem it solves:** a pointer gives you two dimensions. A 3D drawing needs three. Petals3D's answer is the **guide plane** - the user first draws a surface, then draws _on_ that surface. Section 3 covers this in detail; it is the central idea of the whole codebase.
-
-### Positioning
-
-|             | Excalidraw  | Feather      | Petals3D                                 |
-| ----------- | ----------- | ------------ | ---------------------------------------- |
-| Dimensions  | 2D          | 3D           | 3D                                       |
-| Input       | mouse       | stylus/mouse | pointer-type aware (pen / mouse / touch) |
-| Persistence | local-first | cloud        | local-first (IndexedDB)                  |
-| Aesthetic   | hand-drawn  | hand-drawn   | hand-drawn                               |
-| Built by    | team        | team         | solo                                     |
+| Section                                            | Answers                             |
+| -------------------------------------------------- | ----------------------------------- |
+| [1. What it is](#1-what-it-is)                     | what the product does               |
+| [2. Vocabulary](#2-vocabulary)                     | what the 3D words mean              |
+| [3. Repo tour](#3-repo-tour)                       | where everything lives              |
+| [4. The core idea](#4-the-core-idea)               | how a 2D pointer draws in 3D        |
+| [5. How a stroke is made](#5-how-a-stroke-is-made) | the geometry pipeline               |
+| [6. State](#6-state)                               | who owns what, and the one big cost |
+| [7. Saving](#7-saving)                             | the storage shape and its rules     |
+| [8. Undo and redo](#8-undo-and-redo)               | how the loop works                  |
+| [9. The joystick](#9-the-joystick)                 | the transform widget                |
+| [10. Rendering](#10-rendering)                     | cameras, lights, colour             |
+| [11. Cookbook](#11-cookbook)                       | "I want to change X, go to Y"       |
+| [12. Rough edges](#12-rough-edges)                 | what is broken or unfinished        |
 
 ---
 
-## 2. Stack
+## 1. What it is
 
-| Layer                          | Choice                      | Version           |
-| ------------------------------ | --------------------------- | ----------------- |
-| Build                          | Vite (Rolldown, oxc minify) | 8.3               |
-| UI                             | React                       | 19.2              |
-| 3D renderer                    | three.js                    | 0.186.0           |
-| React ↔ three bridge           | @react-three/fiber          | 9.7               |
-| 3D helpers (controls, cameras) | @react-three/drei           | 10.7              |
-| Post-processing (bloom)        | @react-three/postprocessing | 3.1               |
-| State                          | zustand                     | 5.x               |
-| Persistence                    | idb-keyval (IndexedDB)      | 6.x               |
-| Styling                        | Tailwind CSS                | 4.3 (Vite plugin) |
-| Icons                          | @tabler/icons-react         | 3.46              |
-| Notifications                  | react-toastify              | 11.x              |
-| Type face                      | Funnel Sans (Google Fonts)  | -                 |
+A **browser-based 3D drawing tool**. You draw freehand strokes with a mouse,
+stylus or finger. Each stroke becomes real 3D geometry in a scene you can orbit,
+transform, group and export. No account, no install, no server. Work is saved in
+the browser.
 
-**No backend.** There is no API layer, no auth, and no server. Earlier commits (`4dd500d`, `65dc457`, `9483c9d`) removed a sign-in flow deliberately to make the tool free and frictionless. `axios` and `react-router-dom` remain in `package.json` as leftovers from that era with zero imports.
+**The hard problem:** a pointer gives you two numbers, X and Y. A 3D drawing
+needs three. Section 4 is how this app answers that, and it is the idea the
+whole codebase is built around.
 
-### Two version constraints that are not free to change
+### Getting it running
 
-- **React is pinned to `~19.2.8`, not `^19`.** `@react-three/fiber` declares `react >=19 <19.3`, so React 19.3 breaks the peer contract. Bumping React means waiting for R3F.
-- **three.js must stay below 0.187.** `postprocessing` (pulled in by `@react-three/postprocessing`) declares `three >=0.168 <0.187`. The previously pinned 0.182.0 already violated the installed copy's range; 0.186.0 resolves it.
-
-Vite 8 ships Rolldown and no longer bundles esbuild, so `build.minify` is `'oxc'`. Setting it to `'esbuild'` fails to resolve at build time.
-
-**Scale:** ~11,800 lines across the application, plus 18 local SVG icon components. Generic icons come from Tabler; see section 7.
-
-### Styling conventions
-
-Tailwind v4 is configured in `tailwind.config.js`, which v4 does **not** auto-discover - it is loaded by the `@config` directive at the top of `src/App.css`, and must be ESM because the package is `"type": "module"`. The config holds the Funnel Sans family and the three keyframe animations.
-
-`src/App.css` contains only what a utility cannot express: resets on `html`, `body` and `#root`, none of which React renders. Everything else is an inline utility, including range-slider thumbs and number-input spinners via arbitrary variants.
-
-Two class names carry **no styles at all** and exist purely as JavaScript hooks: `custom-scrollbar` and `gesture-allowed`. `Editor.jsx` finds them with `closest()` to exempt those containers from the page-wide gesture and scroll suppression. They are listed in the ESLint ignore list for `no-unknown-classes`. Do not remove them from markup.
-
----
-
-## 3. The core mechanic: how 2D input becomes 3D geometry
-
-This is the concept everything else is built around. It runs in two stages.
-
-### Stage 1 - Draw a guide surface
-
-`DynamicGuidePlane.jsx` mounts an **invisible 4000×4000 plane** at the world origin. Every frame, `SyncCameraFromMain` copies the camera's rotation onto it, so the plane is always perfectly perpendicular to the viewer - a screen-aligned scratch surface.
-
-```
-pointer (2D screen)
-    │  raycast against the screen-aligned plane
-    ▼
-3D world point + surface normal
+```bash
+npm install     # also installs the pre-commit hook
+npm run dev     # http://localhost:3000
+npm run build   # type-check, then bundle
+npm run lint
+npm run format
 ```
 
-The user draws a curve on it. On pointer-up, `createContinuousRibbonGeometry(points, width=100, planeNormal)` takes that flat curve and **extrudes it 100 units along the plane normal**, producing a curved wall - a translucent grey ribbon that follows the profile the user just drew.
+### The stack
 
-That ribbon is tagged `userData.type = 'OG_GUIDE_PLANE'` and handed up via `onDrawingFinished(ribbonMesh)`.
+| Layer            | Choice                      | Version           |
+| ---------------- | --------------------------- | ----------------- |
+| Language         | TypeScript, strict          | 6.x               |
+| Build            | Vite (Rolldown, oxc minify) | 8.3               |
+| UI               | React                       | 19.2              |
+| 3D renderer      | three.js                    | 0.186.0           |
+| React to three   | @react-three/fiber          | 9.7               |
+| Camera, controls | @react-three/drei           | 10.7              |
+| Bloom            | @react-three/postprocessing | 3.1               |
+| State            | zustand                     | 5.x               |
+| Storage          | idb-keyval (IndexedDB)      | 6.x               |
+| Styling          | Tailwind CSS                | 4.3 (Vite plugin) |
+| Icons            | @tabler/icons-react         | 3.46              |
+| Toasts           | react-toastify              | 11.x              |
 
-### Stage 2 - Draw on that surface
+**Three version pins you cannot casually bump:**
 
-`CanvasOperations.handleGuideDrawingFinished` receives the ribbon, stores it as `dynamicDrawingPlaneMesh`, activates the pen, and locks orbit controls.
+| Pin                   | Why                                                 |
+| --------------------- | --------------------------------------------------- |
+| React `~19.2.8`       | `@react-three/fiber` requires `>=19 <19.3`          |
+| three.js `< 0.187`    | `postprocessing` requires `>=0.168 <0.187`          |
+| `build.minify: 'oxc'` | Vite 8 ships Rolldown and no longer bundles esbuild |
 
-`DrawLine.jsx` now raycasts the pointer **against the ribbon** instead of a flat plane. Every stroke lands on a curved surface positioned in 3D space. Because the ribbon carries real surface normals, strokes drawn on it are oriented correctly in three dimensions.
-
-**That is the whole trick.** Draw a profile → it becomes a surface → draw on the surface. Repeat to build up a model.
-
-### The three guide modes
-
-| Mode           | Component                   | What it produces                                    | `userData.type`    |
-| -------------- | --------------------------- | --------------------------------------------------- | ------------------ |
-| **Draw guide** | `DynamicGuidePlane.jsx`     | Extrudes a drawn profile into a wall                | `OG_GUIDE_PLANE`   |
-| **Bend guide** | `DynamicBendGuidePlane.jsx` | Sweeps the stored profile along a second drawn path | `BEND_GUIDE_PLANE` |
-| **Loft guide** | `LoftGuidePlane.jsx`        | Skins a surface across several selected strokes     | `LOFT_SURFACE`     |
-
-**Bend** is the most interesting of the three. The first profile a user draws is kept in the store as `ogGuidePoints` / `ogGuideNormals`. When bend mode is entered, the user draws a _second_ curve - a rail - and `bendOGGuide(ogGuidePoints, railPoints, ...)` (`helpers/bendGuideHelper.js:360`) sweeps the profile along it. This is a classic sweep operation, and it is how curved, organic guide surfaces get built without any numeric input.
-
-**Loft** works from existing geometry rather than new strokes. The user selects drawn lines; `helpers/loftGuideHelper.js` aligns them (`alignCurvesForLofting`), detects closed loops (`detectAndCombineConnectedLoop`), resamples them to matching segment counts (`resampleCurveNoNormals`, `ensureEvenCount`), and skins a surface across them (`createControlledLoftedSurface`).
-
----
-
-## 4. The stroke geometry pipeline
-
-A stroke is not a line primitive. It is **solid tube geometry** built from scratch, which is what gives strokes real thickness, shading, and exportability.
-
-### Building one stroke
-
-1. **Sample.** Pointer positions are raycast onto the active guide surface, giving a world point, a surface normal, and (for a stylus) a pressure value.
-
-2. **Smooth.** `smoothPoints` / `smoothArray` (`helpers/drawHelper.js`) apply a moving-average window sized by the _Stable Stroke_ slider. This is the jitter reduction that makes hand input look deliberate.
-
-3. **Thin.** `filterPoints` drops samples closer together than a tolerance, so a slow hand does not generate thousands of redundant vertices.
-
-4. **Frame.** For each point, a **parallel-transport frame** is propagated along the curve. Rather than recomputing an arbitrary "up" vector per point (which makes the tube twist unpredictably), each frame is rotated from the previous one by the quaternion between successive tangents. This is the standard fix for the tube-twisting problem and is what keeps the stroke's cross-section stable around curves.
-
-5. **Extrude.** Each point gets four corners - top-left, top-right, bottom-right, bottom-left - offset along the frame's right and up vectors by half-width and half-height. Those dimensions come from `getAdaptiveStrokWidth(strokeType, pressure, width)`, which is what makes the four brush types differ:
-
-    | Brush   | Cross-section                                 | Effect                                 |
-    | ------- | --------------------------------------------- | -------------------------------------- |
-    | `cube`  | square, scales with pressure                  | default solid stroke                   |
-    | `taper` | square, scaled by `sin(t·π)` along the stroke | thin at both ends, thick in the middle |
-    | `paint` | wide, fixed 0.01 height                       | flat brush ribbon                      |
-    | `belt`  | fixed 0.01 width, tall                        | vertical strap                         |
-
-6. **Index as four separate strips.** The four faces of the tube are built as **four independent meshes**, not one. There is a comment at `DrawLine.jsx:527` explaining why: generating all four strips in one geometry produces harsh visible seams at the shared edges, and the seams become obvious once opacity drops below 1.
-
-7. **Merge on pointer-up.** The four strips are merged with `BufferGeometryUtils.mergeGeometries`, converted to non-indexed, and given computed vertex normals and bounds. The four temporaries are removed and disposed. The result is one mesh tagged `userData.type = 'LINE'`.
-
-### Mirroring
-
-When mirror X/Y/Z is enabled, every sampled point is transformed into the guide plane's local space, negated on the chosen axis, and transformed back (`getMirroredPoint`). Mirrored strokes are built in parallel with the primary one - four more strips per active axis - and saved as independent `LINE` records with `is_mirror: true`.
-
-### Tension (press-and-hold)
-
-Holding still for one second mid-stroke enters **tension mode**. Vertical pointer movement then lerps every interior point toward the straight line between the stroke's endpoints (`applyTensionToPoints`), letting a wobbly freehand curve be straightened by feel rather than redrawn. The pre-tension state is snapshotted so the effect is continuous rather than destructive.
-
-### Primitive shapes
-
-Freehand is one of four shape modes. `straight` snaps to angle increments within the plane; `circle` and `arc` generate their points analytically from a center, normal, and drag radius (`generateCirclePointsWorld`, `generateSemiCircleOpenArcWorld`) while keeping the same downstream tube pipeline.
+Roughly 15,000 lines in `src/`, plus 18 hand-drawn SVG icons.
 
 ---
 
-## 5. State architecture
+## 2. Vocabulary
 
-Four zustand stores, split by concern. None are persisted by zustand middleware - persistence is manual and explicit (section 6).
+Every 3D term this document uses, in plain language.
 
-### `useCanvasDrawStore.js` - _what the pen is doing_
+| Term                | What it means here                                                                                              |
+| ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Scene graph**     | A tree of objects three.js draws. `scene.children` is the top level, and almost everything sits there.          |
+| **Mesh**            | One drawable thing. A mesh is a geometry plus a material.                                                       |
+| **Geometry**        | The raw numbers: vertex positions, normals, colours. No appearance of its own.                                  |
+| **Material**        | How a surface reacts to light. Flat, shaded or glowing in this app.                                             |
+| **Vertex**          | One corner point of a geometry.                                                                                 |
+| **Normal**          | The direction a surface faces at a point. Lighting needs it, and so does drawing onto a surface.                |
+| **Raycast**         | Shoot a ray from the pointer into the scene and report what it hits and where.                                  |
+| **Quaternion**      | A rotation stored as four numbers. Used instead of three angles because it does not jam at the poles.           |
+| **World transform** | Where an object is relative to the scene root.                                                                  |
+| **Local transform** | Where an object is relative to its parent. The same as the world transform when the parent is the scene itself. |
+| **Extrude**         | Push a flat shape along a direction to give it depth. A line becomes a wall.                                    |
+| **Loft**            | Stretch a surface across several curves, like fabric over ribs.                                                 |
+| **Sweep**           | Slide a shape along a path to trace out a surface.                                                              |
+| **`userData`**      | A free-form object three.js lets you hang on any mesh. **Here it _is_ the saved record.** See section 7.        |
+| **Gizmo**           | The arrows and rings you drag to move or rotate a selection.                                                    |
+| **DPR**             | Device pixel ratio, real pixels per CSS pixel. Capped at 2 so retina screens stay fast.                         |
 
-The largest store. Active tool flags (`penActive`, `eraserActive`, `selectLines`, `selectGuide`, `drawGuide`, `bendPlaneGuide`, `loftGuidePlane`, `eraseGuide`), brush settings (`strokeColor`, `strokeWidth`, `strokeOpacity`, `strokeType`, `drawShapeType`, `activeMaterialType`, `pressureMode`), the mirror axes, the active guide surface (`dynamicDrawingPlaneMesh`, `plane`), the stored bend profile (`ogGuidePoints`, `ogGuideNormals`), the selection set (`highlighted`), and the detected `pointerType`.
+---
 
-It also holds **slider background percentages** (`widthBackground`, `opacityBackground`, …) - CSS gradient strings used to paint the filled portion of each range input. These are presentation values living in the same store as scene state.
+## 3. Repo tour
 
-### `useRenderSceneStore.js` - _what the scene contains and how it renders_
+```
+src/
+│
+├── main.tsx                    entry point
+├── App.tsx                     toast container + Editor
+├── App.css                     colour tokens, resets, toast overrides
+│
+├── components/
+│   ├── canvas-operations/      EVERYTHING THAT TOUCHES THE 3D SCENE
+│   │   ├── Editor.tsx                page chrome, load, export, shortcuts
+│   │   ├── Canvas3d.tsx              <Canvas>, cameras, lights, grids
+│   │   ├── CanvasOperations.tsx      mounts every interaction layer
+│   │   ├── DrawLine.tsx              the stroke engine
+│   │   ├── EraseLine.tsx             raycast eraser
+│   │   ├── TransformLine.tsx         select strokes, move, copy, recolour
+│   │   ├── TransformGuide.tsx        select and move a guide surface
+│   │   ├── DynamicGuidePlane.tsx     draw a guide surface
+│   │   ├── DynamicBendGuidePlane.tsx sweep one along a rail
+│   │   ├── LoftGuidePlane.tsx        skin one across strokes
+│   │   ├── HistoryBridge.tsx         applies undo and redo
+│   │   └── JoystickCameraBridge.tsx  tells the joystick where the axes point
+│   │
+│   ├── joystick/               on-screen transform widget, plain SVG
+│   ├── tools/                  the two side rails and their panels
+│   ├── groups/                 four modals: add, rename, copy, delete
+│   ├── svg-icons/              18 domain icons Tabler has no match for
+│   └── *.tsx                   ToolTip, RangeSlider, Toggle, ColorPicker
+│
+├── hooks/                      nine zustand stores, see section 6
+├── helpers/                    geometry maths, history capture, notifications
+├── db/storage.ts               every read and write to IndexedDB
+├── config/                     scene palette, scene object types
+└── types/                      domain.ts (the data model), history.ts
+```
 
-`activeScene` (a live three.js `Scene` reference held in React state), `groupData` (the full document - see section 6), `activeGroup`, `selectedGroups`, and all group CRUD. Also render settings: `lightIntensity`, `canvasBackgroundColor`, `postProcess`, `sequentialLoading`, `dprValue`.
+### The one rule about this layout
 
-### `useCanvasViewStore.js` - _camera and viewport_
+```
+                                  may touch the three.js scene?
 
-`orbitalLock` (disables orbit while drawing), `cameraFov`, `isOrthographic`, the three grid plane toggles, `fullScreen`.
+  components/canvas-operations/   YES. This is the only place.
+  components/joystick/            no, it moves a proxy object (section 9)
+  components/tools/               no
+  components/groups/              no
+  hooks/                          no, they hold plain data
+  helpers/                        only when a caller hands them the scene
+```
 
-### `useDashboardStore.js` - _modal visibility_
+Anything outside `canvas-operations/` that needs the scene asks through a store
+and lets a component inside the canvas do the work.
 
-Booleans for the four group modals, plus `session`, `sortBy`, and several fields left over from the removed auth/dashboard era.
+### Component tree
 
-### One pattern used everywhere
+```
+main.tsx
+└── App.tsx
+    └── Editor.tsx ................... chrome, load, GLTF export, Ctrl+Z
+        ├── ToolPanel.tsx ............ left rail, mode selection
+        │   ├── PenOptionsPanel.tsx ....... brush settings
+        │   └── SceneOptionsPanel.tsx ..... groups + render settings
+        ├── ViewsPanel.tsx ........... right rail, camera, grids, undo, redo
+        ├── Joystick.tsx ............. transform widget
+        ├── groups/*.tsx ............. four modals
+        └── Canvas3d.tsx ............. <Canvas>, cameras, lights, grids
+            └── CanvasOperations.tsx . wires the interaction layers
+                ├── DrawLine.tsx
+                ├── EraseLine.tsx
+                ├── TransformLine.tsx        (when Select Lines is on)
+                ├── TransformGuide.tsx       (when Select Guide is on)
+                ├── DynamicGuidePlane.tsx
+                ├── DynamicBendGuidePlane.tsx
+                ├── LoftGuidePlane.tsx
+                ├── HistoryBridge.tsx
+                └── JoystickCameraBridge.tsx
+```
 
-Every consumer reads state as:
+### Boot sequence
 
-```js
+```
+1. useThemeStore reads localStorage, sets .dark on <html>   (before first paint)
+2. Editor shows the "pick a pointer type" toast
+3. Editor calls loadSceneFromIndexedDB()
+4. no saved scene?  create "Group 1"
+5. Canvas3d mounts the <Canvas>
+6. CanvasOperations calls generateScene()
+        rebuilds one mesh per stored stroke, replaying the whole
+        pipeline from section 5
+7. CanvasOperations calls saveWholeScene()
+        rewrites disk, because step 6 dropped the erased records
+```
+
+---
+
+## 4. The core idea
+
+A pointer gives you X and Y. The trick is to **draw a surface first, then draw
+on it.** Everything else follows from this.
+
+```
+ STEP 1  draw a profile           STEP 2  it becomes a wall      STEP 3  draw on it
+ on an invisible plane            extruded along the normal      strokes land in 3D
+ that always faces you
+
+ ┌────────────────┐               ┌────────────────┐             ┌────────────────┐
+ │                │               │      ####      │             │      ##o#      │
+ │      ___       │               │    ##/  \##    │             │    ##/ o\##    │
+ │    _/   \_     │   ────────▶   │   #/      \#   │  ────────▶  │   #/  o   \#   │
+ │   /       \    │               │   /        \   │             │   /  o     \   │
+ │                │               │  a curved      │             │  o = samples   │
+ └────────────────┘               │  surface       │             │  on the wall   │
+   your drag                      └────────────────┘             └────────────────┘
+```
+
+**Stage 1.** `DynamicGuidePlane.tsx` holds an invisible 4000x4000 plane at the
+origin and copies the camera's rotation onto it every frame, so it is always
+square to the viewer. It behaves like a sheet of paper taped to your screen.
+Your drag is raycast onto it, giving a flat curve in 3D.
+
+**Stage 2.** On pointer up, that curve is extruded 100 units along the plane's
+normal. A flat squiggle becomes a curved wall, tagged
+`userData.type = 'OG_GUIDE_PLANE'`.
+
+**Stage 3.** `CanvasOperations` stores the wall as `dynamicDrawingPlaneMesh` and
+switches the pen on. `DrawLine.tsx` now raycasts against **the wall** instead of
+the flat plane. Every stroke lands on a curved surface, and because the wall
+carries real normals, each stroke is oriented correctly in three dimensions.
+
+Repeat to build up a model.
+
+### Three ways to make a guide surface
+
+| Mode           | Component                   | What it does                                | `userData.type`    |
+| -------------- | --------------------------- | ------------------------------------------- | ------------------ |
+| **Draw guide** | `DynamicGuidePlane.tsx`     | Extrudes a drawn profile into a wall        | `OG_GUIDE_PLANE`   |
+| **Bend guide** | `DynamicBendGuidePlane.tsx` | Sweeps the stored profile along a new curve | `BEND_GUIDE_PLANE` |
+| **Loft guide** | `LoftGuidePlane.tsx`        | Skins a surface across selected strokes     | `LOFT_SURFACE`     |
+
+**Bend** keeps the first profile you drew in the store as `ogGuidePoints`. You
+then draw a second curve, the rail, and `bendOGGuide` slides the profile along
+it. That is how organic, curved surfaces get built with no numeric input.
+
+**Loft** works from strokes you already drew. `helpers/loftGuideHelper.ts` flips
+them so they all run the same way, joins any that form a closed loop, resamples
+them to a matching point count, then stretches a surface across them. Its three
+sliders live in `ToolPanel`.
+
+### What the scene can contain
+
+Every object carries a `userData.type`. `types/domain.ts` narrows a raycast hit
+with `isLineMesh()` and `isGuideMesh()`.
+
+| Type                 | Meaning                          | Erasable | Guide | Saved |
+| -------------------- | -------------------------------- | -------- | ----- | ----- |
+| `LINE`               | a completed stroke               | yes      |       | yes   |
+| `MERGED_LINE`        | several strokes merged into one  | yes      |       | no    |
+| `OG_GUIDE_PLANE`     | extruded guide surface           |          | yes   | no    |
+| `BEND_GUIDE_PLANE`   | swept guide surface              |          | yes   | no    |
+| `LOFT_SURFACE`       | lofted surface                   |          | yes   | no    |
+| `DYNAMIC_GUIDE_LINE` | in-progress guide stroke preview |          | yes   | no    |
+
+Guides are scaffolding. `ClearRemovedObjects` throws them all away at once, and
+none of them are ever written to disk.
+
+---
+
+## 5. How a stroke is made
+
+A stroke is **not** a line primitive. It is a solid tube built from scratch,
+which is what gives it thickness, shading and something to export.
+
+```
+ pointer moves
+      │
+      ▼
+ ┌──────────┐  raycast onto the active guide surface
+ │  SAMPLE  │  gives a world point, a surface normal and a pressure value
+ └────┬─────┘
+      ▼
+ ┌──────────┐  moving average, window set by the Stable Stroke slider
+ │  SMOOTH  │  removes hand jitter
+ └────┬─────┘
+      ▼
+ ┌──────────┐  drop samples closer together than a tolerance
+ │   THIN   │  a slow hand no longer makes thousands of vertices
+ └────┬─────┘
+      ▼
+ ┌──────────┐  parallel transport: rotate each frame from the previous one
+ │  FRAME   │  stops the tube twisting as the curve bends
+ └────┬─────┘
+      ▼
+ ┌──────────┐  four corners per point, sized by brush type and pressure
+ │ EXTRUDE  │  built as FOUR SEPARATE strips, see below
+ └────┬─────┘
+      ▼
+ ┌──────────┐  merge the strips, compute normals and bounds
+ │  MERGE   │  one mesh, tagged LINE
+ └────┬─────┘
+      ▼
+ record pushed into the group, written to IndexedDB, history entry pushed
+```
+
+**Why four separate strips.** Generating all four faces of the tube in one
+geometry leaves harsh seams along the shared edges, and they become obvious the
+moment opacity drops below 1. They are built apart and merged at the end.
+
+### The four brushes
+
+Set by `getAdaptiveStrokeWidth` in `helpers/drawHelper.ts`.
+
+| Brush   | Cross-section                   | Result                             |
+| ------- | ------------------------------- | ---------------------------------- |
+| `cube`  | square, grows with pen pressure | the default solid stroke           |
+| `taper` | square, scaled by `sin(t * pi)` | thin at both ends, thick in middle |
+| `paint` | wide, height fixed at 0.01      | a flat brush ribbon                |
+| `belt`  | width fixed at 0.01, tall       | a vertical strap                   |
+
+### Three variations on the same pipeline
+
+**Mirroring.** With mirror X, Y or Z on, every sample is moved into the guide
+plane's local space, negated on that axis, and moved back. Mirrored strokes are
+built alongside the original and saved as independent records with
+`is_mirror: true`. All of them undo as one action.
+
+**Tension.** Hold still for one second mid-stroke to enter tension mode. Moving
+up and down then pulls every interior point toward the straight line between the
+two endpoints, so a wobbly curve can be straightened by feel instead of redrawn.
+The pre-tension points are kept, so the effect is continuous, not destructive.
+
+**Primitive shapes.** `straight` snaps the drag to angle increments in the
+plane. `circle` and `arc` compute their points from a centre, a normal and the
+drag radius. All three then go through the same extrude and merge steps.
+
+---
+
+## 6. State
+
+Nine stores. None use zustand's persist middleware; saving is manual and
+explicit.
+
+| Store                     | Owns                                                                  |
+| ------------------------- | --------------------------------------------------------------------- |
+| `useCanvasDrawStore`      | what the pen is doing: tool flags, brush settings, mirrors, selection |
+| `useRenderSceneStore`     | what the scene contains: `groupData`, `activeGroup`, lighting         |
+| `useCanvasViewStore`      | camera and viewport: orbit lock, FOV, grids, fullscreen               |
+| `useDashboardStore`       | which group modal is open                                             |
+| `useHistoryStore`         | the undo and redo stacks, the busy lock                               |
+| `useThemeStore`           | light, dark or system. Persisted to localStorage                      |
+| `useEditorPrefsStore`     | transform style and step size. Persisted to localStorage              |
+| `useTransformTargetStore` | the seam between the canvas and the joystick                          |
+| `useJoystickCameraStore`  | where each world axis points on screen. **Not zustand**               |
+
+### The one performance cost you need to know
+
+Every consumer reads state like this:
+
+```ts
 const { penActive, strokeWidth } = canvasDrawStore((state) => state)
 ```
 
-The selector returns the entire state object, so it is a new reference on every change. **Every component subscribed to a store re-renders whenever any field in that store changes** - 35 call sites across 18 files. Moving the width slider re-renders the draw layer, both tool panels, the views panel, and all four group modals. This is the single largest structural constraint on drawing responsiveness.
+The selector returns the whole state object, so it is a new reference on every
+change.
+
+```
+  move the width slider
+        │
+        ▼
+  canvasDrawStore changes
+        │
+        ├──▶ DrawLine re-renders
+        ├──▶ ToolPanel re-renders
+        ├──▶ PenOptionsPanel re-renders
+        ├──▶ ViewsPanel re-renders
+        └──▶ all four group modals re-render
+```
+
+None of those needed the width. This is the single biggest structural limit on
+drawing responsiveness, and fixing it does not require touching any geometry
+code. Narrow the selectors.
+
+`useJoystickCameraStore` is the deliberate exception. The camera publishes on
+every frame it moves. Routing that through React would re-render the joystick
+sixty times a second to change a few SVG attributes, so it is a plain module
+with a listener set that writes those attributes straight to the DOM.
 
 ---
 
-## 6. Persistence model
+## 7. Saving
 
-### Storage
+### The shape on disk
 
-IndexedDB via `idb-keyval`, database `petals-3d`, object store `states`. Everything lives under **one key: the integer `0`**, holding the entire document (`db/storage.js:36`). There is a commented-out string key (`groups-draft-note`) alongside it, and a second, entirely unused save path for raw lines.
-
-### Document shape
+IndexedDB database `petals-3d`, object store `states`.
 
 ```
-groupData: Group[]
-└── Group
-    ├── uuid, name, created_at, deleted_at
-    ├── visible, active           // exactly one group is active at a time
-    └── objects: LineRecord[]
+  scene-meta                        one small index, rewritten on any change
+  ┌──────────────────────────────┐
+  │ groups: [                    │
+  │   { uuid, name,              │
+  │     visible, active,         │
+  │     created_at, deleted_at,  │
+  │     lineIds: [ a, b, c ] }   │
+  │ ]                            │
+  └──────────────────────────────┘
+         │  references
+         ▼
+  line:a ─── LineRecord           one key per stroke,
+  line:b ─── LineRecord           written only when that stroke changes
+  line:c ─── LineRecord
 ```
 
-### `LineRecord`
+Adding a stroke writes **one** record plus the small index. An older format kept
+the whole document under the integer key `0`; the loader still reads it once,
+converts it and drops it.
 
-Written at `DrawLine.jsx:1384` and read back by `generateScene`:
+### What a stroke stores
 
-| Field                                                                     | Purpose                                              |
-| ------------------------------------------------------------------------- | ---------------------------------------------------- |
-| `type`                                                                    | `'LINE'`                                             |
-| `points`, `normals`, `pressures`                                          | the raw sampled stroke - the source of truth         |
-| `loft_points`                                                             | copy of `points`, consumed by the loft tool          |
-| `color`, `width`, `opacity`, `stroke_type`, `shape_type`, `material_type` | appearance, replayed on load                         |
-| `optimization_threshold`, `smooth_percentage`                             | **the exact smoothing parameters used at draw time** |
-| `position`, `rotation`, `scale`                                           | transform, as plain objects                          |
-| `is_mirror`, `mirror_mode`                                                | mirror provenance                                    |
-| `uuid`, `group_id`                                                        | identity and ownership                               |
-| `is_deleted`                                                              | soft-delete flag                                     |
+| Field                                         | Purpose                               |
+| --------------------------------------------- | ------------------------------------- |
+| `type`                                        | `LINE` or `MERGED_LINE`               |
+| `points`, `normals`, `pressures`              | the raw samples, the source of truth  |
+| `loft_points`                                 | a copy of `points` for the loft tool  |
+| `color`, `width`, `opacity`, `stroke_type`    | appearance, replayed on load          |
+| `optimization_threshold`, `smooth_percentage` | the exact smoothing used at draw time |
+| `position`, `rotation`, `scale`               | world transform                       |
+| `is_mirror`, `mirror_mode`                    | mirror provenance                     |
+| `uuid`, `group_id`                            | identity and ownership                |
+| `is_deleted`                                  | soft delete                           |
 
-### Why geometry is not stored
+### Why the geometry is not stored
 
-Only the **input samples** are persisted, never the generated vertex buffers. On load, `generateScene` (`helpers/drawHelper.js:4`) replays the entire pipeline from section 4 - smooth, thin, frame, extrude, merge - for every stroke in every group.
+Only the **input samples** are saved, never the generated vertex buffers. On
+load, `buildLineMesh` replays the whole of section 5 for every stroke.
 
-This is a genuinely good decision. It keeps stored documents small and makes strokes re-renderable at different qualities later. It also means `optimization_threshold` and `smooth_percentage` must be stored per stroke, because reproducing a stroke requires the exact parameters it was drawn with.
+```
+  what is saved              what is thrown away
+  ─────────────              ───────────────────
+  points                     vertex positions
+  normals                    vertex normals
+  pressures                  indices
+  brush + smoothing params   the merged mesh
+```
 
-### The prototype problem
+That keeps documents tiny and lets strokes be re-rendered at other qualities
+later. It is also why the smoothing parameters live on every stroke: reproducing
+a stroke needs the exact values it was drawn with.
 
-`idb-keyval` serializes with **structured clone**, which preserves an object's own properties but discards its prototype. A `THREE.Vector3` goes in as a vector and comes back as `{x, y, z}` with no methods on it. Any restore-path code that calls a `Vector3` method on a loaded point will throw. This is the root cause behind the reload failures noted in section 10.
+One consequence: a `MERGED_LINE` has no samples of its own, so nothing can
+rebuild it. That is why merge is not yet saveable.
+
+### Three rules that will bite you
+
+**1. A mesh's `userData` IS the saved record.**
+
+```
+      group.objects[3]  ──┐
+                          ├──▶  the same JavaScript object
+      mesh.userData     ──┘
+```
+
+Mutating one mutates the other. The eraser relies on it: it writes
+`mesh.userData.is_deleted = true` and trusts the store to see it. It also means
+nothing may keep a record it did not clone, which is why every deliberate copy
+goes through `helpers/records.ts`.
+
+**2. IndexedDB throws away prototypes.** Structured clone keeps an object's own
+fields and drops its class, so a `THREE.Vector3` would return as a bare
+`{x, y, z}` with no methods, and the first method call on it would throw. Points
+therefore cross as flat `Float32Array`s and are rebuilt on the way out. The
+`Stored*` types in `types/domain.ts` mark which side of the boundary a value is
+on. Mixing them silently flattens reloaded strokes.
+
+**3. There is no cross-key transaction.** Writes go lines first, index second,
+so a crash in between leaves unreferenced records rather than an index pointing
+at nothing. `pruneOrphanLines` sweeps those on the next load.
 
 ### When saving happens
 
-On discrete actions only: stroke completed, stroke erased, transform applied, group created / renamed / copied / deleted, group visibility or active-group changed. Each writes the whole `groupData` document.
+On finished actions only: stroke completed, stroke erased, transform applied,
+selection recoloured or duplicated, group created, renamed, copied or deleted,
+group visibility or active group changed.
 
-There is **no autosave on interval, no `beforeunload`, and no `visibilitychange` flush.** A closed tab or a crash loses everything since the last completed action.
-
-### Aliasing between scene and store
-
-At `DrawLine.jsx:1408` one object literal is assigned to `combinedMesh.userData`; at `:1820` that same object is pushed into the group's `objects` array. **The mesh's userData and the persisted record are the same object in memory.** Mutating one mutates the other.
-
-Some features rely on this: the eraser marks a stroke deleted by writing `obj.userData.is_deleted = true` and trusting the store to see it (`EraseLine.jsx:36`). It works, but it means there is currently no point in the data flow where an immutable snapshot could be taken - which is exactly what undo/redo requires. See section 10.
+There is **no autosave timer, no `beforeunload` and no `visibilitychange`
+flush.** A closed tab loses whatever came after the last finished action.
 
 ---
 
-## 7. Component map
+## 8. Undo and redo
+
+One user action is one entry, however many objects it touched. A mirrored stroke
+that produced four lines is one undo. An eraser drag across nine strokes is one
+undo. The limit is 25 entries, and the stacks reset on reload.
+
+An entry is a **pair of patches**, not a document snapshot. It stores what the
+action replaced and what it produced, so the cost is proportional to what changed
+rather than to the size of the drawing.
 
 ```
-main.jsx
-└── App.jsx                           toast container + editor
-    └── canvas-operations/Editor.jsx  top-level chrome, load, GLTF export
-        ├── tools/ToolPanel.jsx       left rail - mode selection
-        │   ├── PenOptionsPanel.jsx   brush settings (shown when pen active)
-        │   └── SceneOptionsPanel.jsx groups + render settings
-        ├── Canvas3d.jsx              <Canvas>, cameras, lights, grids, orbit
-        │   └── CanvasOperations.jsx  wires every interaction layer
-        │       ├── DynamicGuidePlane.jsx       draw a guide surface
-        │       ├── DynamicBendGuidePlane.jsx   sweep a guide along a rail
-        │       ├── LoftGuidePlane.jsx          skin across selected strokes
-        │       ├── TransformGuide.jsx          gizmo for guide surfaces
-        │       ├── DrawLine.jsx                the stroke engine (1,844 lines)
-        │       ├── TransformLine.jsx           gizmo, copy, merge, recolor
-        │       └── EraseLine.jsx               raycast eraser
-        ├── tools/ViewsPanel.jsx      right rail - camera, grids, fullscreen
-        └── groups/*.jsx              four modals: add, rename, copy, delete
+  [Undo]  or  Ctrl+Z
+     │
+     │  request('undo')           busy = true, whole editor blocked
+     ▼
+  useHistoryStore                 past ──▶ future
+     │
+     │  pending = 'undo'
+     ▼
+  HistoryBridge  (lives INSIDE the <Canvas>)
+     │
+     │  1. releaseSelection()     unparent the selection first
+     │  2. apply each patch       in reverse order for undo
+     │  3. restore the tool       so you land in the tool you acted in
+     │  4. finish()               busy = false
+     ▼
+  scene + IndexedDB + stores all agree again
 ```
 
-### Notable files
+The buttons are ordinary DOM and cannot reach the scene graph, so they **ask**
+for an undo rather than performing one. While an entry is applying, every tool
+refuses to act and `Editor.tsx` covers the app with a full-screen blocker, since
+an entry touches the scene, the document and the stacks in turn, and a click
+landing between those steps would see a half-applied editor.
 
-| File                         | Lines | Role                                                                                             |
-| ---------------------------- | ----- | ------------------------------------------------------------------------------------------------ |
-| `DrawLine.jsx`               | 1,844 | The stroke engine. Pointer handling, tension mode, mirroring, all four shape types, merge, save. |
-| `ToolPanel.jsx`              | 783   | Mode switching. Each mode is a `case` that sets ~10 store flags.                                 |
-| `helpers/drawHelper.js`      | 776   | Geometry math and `generateScene` (the load path).                                               |
-| `TransformLine.jsx`          | 700   | Selection gizmo, copy, geometry merge, recolor.                                                  |
-| `DynamicGuidePlane.jsx`      | 691   | Guide surface creation.                                                                          |
-| `GuidePlane.jsx`             | 661   | **Dead.** Imported nowhere. An earlier static-plane implementation.                              |
-| `helpers/loftGuideHelper.js` | 595   | Curve alignment, resampling, loft surface construction.                                          |
-| `helpers/bendGuideHelper.js` | 424   | The sweep operation.                                                                             |
+| File                     | Role                                           |
+| ------------------------ | ---------------------------------------------- |
+| `types/history.ts`       | the patch kinds and `HistoryEntry`             |
+| `hooks/useHistoryStore`  | the stacks, the busy lock, the pending request |
+| `helpers/historyCapture` | snapshot and restore, `pushHistory`            |
+| `helpers/records`        | every deliberate copy of a record or a group   |
+| `HistoryBridge.tsx`      | applies patches inside the canvas              |
 
-### Icons
+**Not undoable, on purpose:** camera and viewport state, and brush settings.
+Both affect the next action rather than the drawing, and the stroke that used a
+brush setting carries its own copy of it.
 
-Generic icons come from `@tabler/icons-react`, imported by name at each call site. Tabler's props are `size` and `color`, which is what the old local components took, so usage is unchanged.
+**Guides are a special case.** Moving a guide surface is undoable, and it is the
+only patch kind that touches nothing but the scene: a guide has no record, no
+group and no key on disk, so the patch carries the meshes themselves. That works
+only because the stacks reset on reload, so the reference is always still the
+object on screen. Creating or erasing a guide stays outside history.
 
-`src/components/svg-icons/` retains **18 components that Tabler has no faithful equivalent for**, all specific to this app's domain:
-
-| Group            | Components                                                                          |
-| ---------------- | ----------------------------------------------------------------------------------- |
-| Brush profiles   | `CubeStrokeIcon`, `TaperStrokeIcon`, `PaintStrokeIcon`, `BeltStrokeIcon`            |
-| Shading modes    | `FlatShadeIcon`, `GlowShadeIcon`, `RespondShadeIcon`                                |
-| Guide operations | `GuideIcon`, `BendGuidePlaneIcon`, `LoftGuideIcon`, `SelectGuide`, `EraseGuideIcon` |
-| Stylus pressure  | `PressureActiveIcon`, `PressureInActiveIcon`, `StableStrokIcon`                     |
-| Transform / view | `LocalModeIcon`, `GlobalModeIcon`, `OrthograhicView`                                |
-
-These depict brush cross-sections, material response, and guide-plane operations. A generic icon set cannot express them, so they stay hand-drawn. Add new domain icons here and take everything else from Tabler.
-
-### Scene object taxonomy
-
-Everything in the scene is identified by `userData.type`. `config/objectsConfig.js` defines which tools act on which:
-
-| Type                 | Meaning                              | Erasable | Treated as a guide |
-| -------------------- | ------------------------------------ | -------- | ------------------ |
-| `LINE`               | a completed stroke                   | ✅       |                    |
-| `MERGED_LINE`        | several strokes merged into one mesh | ✅       |                    |
-| `OG_GUIDE_PLANE`     | extruded guide surface               |          | ✅                 |
-| `BEND_GUIDE_PLANE`   | swept guide surface                  |          | ✅                 |
-| `LOFT_SURFACE`       | lofted surface                       |          | ✅                 |
-| `DYNAMIC_GUIDE_LINE` | the in-progress guide stroke preview |          | ✅                 |
-
-Guide objects are transient scaffolding. They are cleared wholesale by `ClearRemovedObjects` in `CanvasOperations.jsx` and are never persisted.
+`findings/undo-redo-cases.md` lists every case and edge case in detail.
 
 ---
 
-## 8. Tool inventory
+## 9. The joystick
 
-### Modes (`ToolPanel.handleDraw`)
+The on-screen widget that moves, rotates and scales a selection.
 
-Each mode sets a large set of mutually exclusive flags. There are ten:
+It is **flat SVG outside the canvas**, not a second 3D scene. It still turns
+with the camera:
 
-`pen` · `eraser` · `selectLines` · `selectGuide` · `draw_guide` · `erase_guide` · `bend_guide` · `loft_guide` · `cancel_loft_guide` · `generate_loft_guide`
+```
+  inside the <Canvas>                      outside it
+  ───────────────────                      ──────────
 
-### Brush settings (`PenOptionsPanel`)
+  JoystickCameraBridge                     Joystick.tsx
+    reads camera.quaternion                  reads those angles
+    works out where X, Y, Z                  rotates each handle
+    point on screen             ──────▶      to match
+    publishes on change                      writes straight to the DOM
+```
 
-- **Color** - custom picker with hex input and eyedropper
-- **Brush** - taper · cube · paint · belt
-- **Shape** - free hand · straight · circle · arc
-- **Material** - flat (unlit) · shaded (PBR) · emissive (glow, feeds bloom)
-- **Opacity**, **Width**, **Stable Stroke** - sliders
-- **Mirror** - independent X / Y / Z toggles
+Only the camera's **orientation** is used, never its lens, so perspective and
+orthographic behave identically and no pixel-to-world conversion is needed.
+Dragging is quantised into whole steps instead.
 
-### View controls (`ViewsPanel`)
+### How it reaches the scene without touching it
 
-- **Full screen**
-- **Perfect View** - snaps the camera to the nearest axis, preserving zoom distance
-- **FOV slider** - eased toward the target each frame by `SmoothFOV`
-- **Grids** - independent X / Y / Z grid planes, colored crimson / emerald / blue by axis
-- **Orbit lock** - freezes rotation and pan so drag gestures draw instead of orbit
-- **Undo / Redo** - **buttons present, no handlers attached**
+```
+  TransformLine / TransformGuide            Joystick
+  ──────────────────────────────            ────────
+  collect the selection into                moves that group
+  one proxy Group                ──────▶    calls commit()
+  publish it through
+  useTransformTargetStore
+```
 
-### Pointer-type awareness
+That indirection is why the joystick could be added without changing any
+selection logic, why the old three.js gizmo still works through the same path,
+and why guide surfaces get the same widget for free.
 
-Distinctive to this codebase: the app resolves the user's input device on first contact (`Editor.jsx:69`), stores it as `pointerType`, and **every interaction handler gates on it** (`if (event.pointerType === pointerType)`). This prevents a palm resting on a tablet from drawing while the stylus is in use. It can be overridden manually from the burger menu.
+What `commit()` does differs. `TransformLine` bakes the group's world matrix
+back into each stroke record and saves them. `TransformGuide` has no records to
+save, so it only records history.
 
-### Export
+### Tuning the feel
 
-GLTF via three.js `GLTFExporter`, ASCII `.gltf`, from the burger menu. Guide surfaces are included in the export because they live in the same scene - arguably they should be filtered out.
+| Constant              | File                   | Controls                      |
+| --------------------- | ---------------------- | ----------------------------- |
+| `PIXELS_PER_STEP`     | `Joystick.tsx`         | move and scale drag rate      |
+| `HUB_PIXELS_PER_STEP` | `Joystick.tsx`         | trackball rotation rate       |
+| `DEGREES_PER_STEP`    | `Joystick.tsx`         | arc rotation rate             |
+| `SCALE_PER_STEP`      | `joystickTransform.ts` | percent per step when scaling |
 
----
-
-## 9. Rendering setup
-
-- **Cameras** - perspective (default, FOV-adjustable) or orthographic, switchable. Orbit distance clamped 20–150.
-- **Lighting** - one directional light with a 1024² shadow map, plus a fixed `ambientLight` at intensity 10. The user-facing "light intensity" slider drives only the directional light; the very high ambient means the scene stays readable at zero.
-- **Bloom** - optional `EffectComposer` + `Bloom` pass. `SceneComposer` defers mounting until after the first frame, and enables camera layer 1 with `gl.autoClear = false` to composite a separate glow layer.
-- **DPR** - capped at `[1, 2]`.
-- **Sequential loading** - an optional reveal animation that hides every object and un-hides them at 100 ms intervals.
-
----
-
-## 10. Current state
-
-### Working
-
-Drawing, the full guide-plane system, all four brushes and four shapes, mirroring, tension mode, the eraser, transform gizmos, copy, geometry merge, groups with visibility, GLTF export, local persistence, and a mobile-aware responsive layout with browser gesture suppression.
-
-The build is healthy: `npm install` and `vite build` both succeed, producing a 425 kB gzipped bundle in about three seconds.
-
-### Broken
-
-Three defects destroy user work silently. All three were reproduced, not inferred.
-
-1. **Straight-line strokes do not survive a reload.** `filterPoints` (`drawHelper.js:585`) calls `distanceTo` on restored points, which no longer have the `Vector3` prototype after structured clone. Freehand escapes only because `smoothPoints` rebuilds real vectors first; straight lines skip smoothing and go directly into the filter. The `try/catch` in `updateLine` swallows the throw into a `console.log`, leaving empty geometry and no visible error.
-
-2. **Group visibility and active-group switches are never written to disk.** `SceneOptionsPanel.jsx:117` and `:124` call `saveGroupToIndexDB`, which is never imported in that file - of the ten files that call it, this is the only one missing the import. Both handlers are `async`, so the `ReferenceError` becomes an unhandled rejection rather than a visible crash. Both are wired to live controls.
-
-3. **Recoloring a selected line throws.** `TransformLine.jsx:371–373` reference `object` inside a callback whose parameter is `obj`. With no error boundary anywhere in the tree, the throw blanks the editor.
-
-Supporting problems: `setError` is undefined in the save-failure branches of three group modals, so the one path that could have reported failure #1 is itself broken.
-
-### Fragile
-
-- **`filterPoints` tolerance check is a malformed ternary** (`drawHelper.js:599`). At exactly three points the condition evaluates to a truthy object, so thinning is skipped entirely. This also happens to be why bug #1 does not fire at three points.
-- **`generateScene` calls `createInitialLineMesh` with 7 arguments for 6 parameters** (`drawHelper.js:18` → `:625`). Every value shifts one slot left. It survives only because each corrupted value is overwritten or disposed downstream.
-- **Guide-plane drawing state lives in plain `let` bindings**, not refs (`DynamicGuidePlane.jsx:37–43`). Any re-render mid-stroke wipes the in-progress stroke - and whole-store subscriptions make re-renders frequent.
-- **`setRenderMode` writes to the wrong key** (`useRenderSceneStore.js:160`), assigning `renderOptions` instead of `renderMode`.
-- **Six components are declared inside other components' render bodies** (`Editor.jsx:150`, `Canvas3d.jsx:41/80/93/115`, `CanvasOperations.jsx:82`). Each is a fresh function identity per render, so React remounts the subtree instead of updating it. The largest registers fourteen document-level listeners on mount - all fourteen churn on every editor render.
-
-### Salvaged from the retired GuidePlane
-
-`GuidePlane.jsx` was a second, older implementation of the guide-plane idea that nothing imported or rendered. It was removed, but it carried **two features the current `DynamicGuidePlane` does not have**, both worth building:
-
-- **A guide-object eraser.** It kept an `eraserRadius` and could rub out guide surfaces directly, rather than clearing them wholesale.
-- **Press-and-hold to place a circle.** A hold timer promoted the in-progress stroke into a circle centred on the press point, so a primitive could be dropped without leaving the pen.
-
-It also tracked several guide surfaces at once via `allGuideObjects`, where the current one makes a single surface and hands it off.
-
-It could not simply be re-enabled: it never tagged its output `OG_GUIDE_PLANE` and never wrote `ogGuidePoints`, so guide cleanup and bend mode would both fail. Recover the source with `git show <sha>:src/components/canvas-operations/GuidePlane.jsx`.
-
-### Missing
-
-- **Undo / redo.** Buttons exist without handlers. The blocker is architectural, not UI: a command history needs immutable snapshots, and the mesh-to-store aliasing in section 6 means no such snapshot point exists yet. This must be resolved first.
-- **Tests and CI.** Zero tests, no `.github` directory. `lint-staged` is configured in `package.json` but no git hook ever invokes it.
-- **Error boundary.** Any throw blanks the editor.
-- **Crash-safe save.** No `visibilitychange` or `beforeunload` flush.
-- **Code splitting.** One 1.5 MB JS chunk, past Vite's warning threshold.
-
-### Signal-to-noise in tooling
-
-`eslint` reports 130 problems: 103 errors and 27 warnings. But **93 of the 103 errors are unused `(e)` parameters on click handlers.** The 10 genuine undefined references - which include all three data-loss bugs above - are buried in that noise. Setting `args: 'none'` on the `no-unused-vars` rule takes the error count from 103 to 10, and every survivor is a real defect.
-
-### Dead code
-
-| Item                                                                                     | Lines |
-| ---------------------------------------------------------------------------------------- | ----- |
-| `canvas-operations/GuidePlane.jsx` - imported nowhere                                    | 661   |
-| `toolHelper.handleGroupOperation` - calls a React hook outside a component               | 22    |
-| `db/storage.js` - `saveSceneLinesToIndexDB`, `customReplacer`, `clearSceneFromIndexedDB` | ~40   |
-| `getSnappedLinePointsInPlane` - builds an interpolated array, returns only the endpoint  | ~14   |
-| `helpers/sceneActions.js` - a comment block assigned to an unread variable               | 9     |
-| `axios`, `react-router-dom` - dependencies with zero imports                             | -     |
-
-### Duplication
-
-The parallel-transport ribbon builder from section 4 exists in **five near-identical copies**, roughly 150 lines each: `DrawLine.jsx:423` and `:620` (same file, sixty lines apart), `DynamicGuidePlane.jsx:207`, `DynamicBendGuidePlane.jsx:127`, and `drawHelper.js:188`. They have already drifted - only some populate the vertex color attribute.
-
-Relatedly, every vertex carries **four color floats that nothing reads**: no material in `getActiveMaterial` sets `vertexColors`, so three.js never binds the attribute. The highlight-reset loop in `CanvasOperations.jsx:113` walks every vertex of every selected mesh rewriting colors that cannot render. Either enable `vertexColors` and get per-vertex tinting for free, or drop the attribute and reclaim the memory.
+Leave `DEGREES_PER_STEP` at 1. The arc handle rotates under your finger by the
+angle you sweep, and the axis turns by that same angle. Change one without the
+other and the handle ends up pointing somewhere the selection is not.
 
 ---
 
-## 11. Notes toward the browser-friendly goal
+## 10. Rendering
 
-The Excalidraw comparison implies specific properties the codebase does not have yet:
+| Piece                  | Setup                                                                             |
+| ---------------------- | --------------------------------------------------------------------------------- |
+| **Cameras**            | Perspective with adjustable FOV, or orthographic. Orbit distance 20 to 150.       |
+| **Lighting**           | One directional light with a 1024² shadow map, plus ambient from the theme.       |
+| **Light slider**       | Drives only the directional light. High ambient keeps the scene readable at zero. |
+| **Bloom**              | Optional. Defers mounting until after the first frame, composites layer 1.        |
+| **DPR**                | Capped at `[1, 2]`.                                                               |
+| **Sequential loading** | Optional reveal animation, un-hiding one object every 100 ms.                     |
 
-- **Never lose work.** Currently three known paths lose it silently, and there is no crash-safe flush. This is the gap between the current state and "as trustworthy as Excalidraw."
-- **Instant, obvious first run.** The app currently opens with a blocking toast asking the user to pick a pointer type before anything else happens.
-- **Shareable.** No URL-encoded scenes, no export/import of a document file, no collaboration. GLTF export is one-way and includes guide scaffolding.
-- **Fast on mid-range hardware.** Whole-store subscriptions and per-render component remounting are the two structural ceilings here, and both are fixable without touching the geometry code.
+### Colour lives in exactly two places
+
+```
+  src/App.css          CSS variables   ──▶  tailwind.config.js  ──▶  bg-surface
+                                                                     text-ink
+                                                                     bg-accent
+
+  src/config/theme.ts  real hex values ──▶  three.js scene
+                                            (cannot read CSS variables)
+```
+
+Components never write a hex value and never need a `dark:` variant. The `.dark`
+class on `<html>` flips the whole palette at once.
+
+Green is the accent and is reserved for controls that are switched on. Panels,
+borders, tracks and text are neutral in both themes.
+
+### Two class names that carry no styles
+
+`custom-scrollbar` and `gesture-allowed` exist only as markers. `Editor.tsx`
+finds them with `closest()` to exempt those containers from the page-wide
+gesture and scroll suppression. Do not remove them from markup.
 
 ---
 
-_Document generated from a full read of the codebase. Line references are accurate as of commit `2459e6d`._
+## 11. Cookbook
+
+| I want to                      | Start here                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------------- |
+| Add a brush profile            | `getAdaptiveStrokeWidth` in `helpers/drawHelper.ts`                               |
+| Add a tool to the left rail    | a new case in `ToolPanel.handleDraw`, plus a button                               |
+| Change what a stroke stores    | `LineRecord` in `types/domain.ts`, then `db/storage.ts`                           |
+| Make an action undoable        | push a patch via `helpers/historyCapture`, apply it in `HistoryBridge`            |
+| Change a UI colour             | the tokens at the top of `src/App.css`                                            |
+| Change a 3D scene colour       | `src/config/theme.ts`                                                             |
+| Change joystick speed          | the table in section 9                                                            |
+| Add a new guide surface type   | a component in `canvas-operations/`, a `userData.type`, `config/objectsConfig.ts` |
+| Change when or what gets saved | `db/storage.ts`, and the call sites listed in section 7                           |
+| Fix a re-render storm          | narrow the zustand selector, section 6                                            |
+| Add a keyboard shortcut        | the `keydown` effect in `Editor.tsx`                                              |
+| Understand a raycast hit       | `isLineMesh` and `isGuideMesh` in `types/domain.ts`                               |
+
+### Tool inventory
+
+**Modes**, each clearing the others: `pen`, `eraser`, `selectLines`,
+`selectGuide`, `draw_guide`, `erase_guide`, `bend_guide`, `loft_guide`,
+`cancel_loft_guide`, `generate_loft_guide`.
+
+**Brush settings:** colour picker with hex field and eyedropper, brush profile,
+shape, material, opacity, width, stable stroke, and independent X, Y, Z mirrors.
+
+**View controls:** full screen, perfect view, FOV, three grid planes, orbit
+lock, undo, redo.
+
+**Scene options:** group list with visibility and active selection, four group
+operations, and the render settings.
+
+**Pointer-type awareness** is unusual and worth knowing about. The app locks on
+to the first input device that touches it, and every handler checks
+`event.pointerType` against it, so a palm resting on a tablet cannot draw while
+a stylus is in use. Override it from the burger menu.
+
+**Export** is ASCII GLTF from the burger menu. Guide surfaces are included
+because they share the scene, which is arguably wrong.
+
+---
+
+## 12. Rough edges
+
+An honest list. Nothing here is a surprise waiting to be discovered.
+
+| Issue                                        | Detail                                                                                                                       |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Merge does not persist**                   | A merged mesh has no samples, so nothing can rebuild it. Needs a storage format change. Nothing in the UI triggers it today. |
+| **Non-uniform scale on a rotated selection** | Transforms are stored as position, rotation and scale, and a sheared matrix cannot be decomposed into those three.           |
+| **Whole-store subscriptions**                | Section 6. The biggest ceiling on responsiveness.                                                                            |
+| **Components declared inside renders**       | Eight of them. React remounts the subtree instead of updating it. ESLint flags each one.                                     |
+| **Guide drawing state in plain `let`**       | Not refs, so a re-render mid-stroke wipes the in-progress guide.                                                             |
+| **Unused vertex colours**                    | Four floats per vertex that no stroke material reads. Enable `vertexColors` or drop the attribute.                           |
+| **The ribbon builder is duplicated**         | Roughly 150 lines, four near-identical copies, already drifting.                                                             |
+| **No error boundary**                        | Any throw blanks the editor.                                                                                                 |
+| **No crash-safe save**                       | Section 7.                                                                                                                   |
+| **No tests, no CI**                          | A `lint-staged` pre-commit hook in `.githooks` is the whole safety net.                                                      |
+| **One 1.5 MB JS chunk**                      | Past Vite's warning threshold. No code splitting.                                                                            |

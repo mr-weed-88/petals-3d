@@ -20,7 +20,9 @@ import {
     generateSemiCircleOpenArcWorld,
 } from '../../helpers/drawHelper'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveLines, saveSceneMeta } from '../../db/storage'
+import { cloneLineRecord } from '../../helpers/records'
+import { historyBusy, pushHistory } from '../../helpers/historyCapture'
 import type {
     LineRecord,
     MirrorAxis,
@@ -769,6 +771,9 @@ const DrawLine = () => {
     }
 
     function startDrawing(event: PointerEvent): void {
+        // Nothing may touch the scene while an undo is being applied, or the
+        // stroke would land half inside the operation being reversed.
+        if (historyBusy()) return
         if (event.pointerType !== pointerType) return
         if (!planeRef.current) return
 
@@ -1464,7 +1469,30 @@ const DrawLine = () => {
         }
 
         setGroupData([...groupData])
-        await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+
+        /*
+         * Only the stroke just drawn, and its mirrors. Writing the whole
+         * document here meant every completed stroke re-serialised every
+         * stroke before it.
+         */
+        if (ogLineData) {
+            await saveLines([ogLineData, ...mirrorLineData])
+
+            /*
+             * One entry for the stroke and every mirror of it, so a single
+             * undo takes the whole gesture back rather than one strip at a
+             * time. The records are cloned because the live ones belong to
+             * the meshes and will keep changing.
+             */
+            pushHistory('Draw stroke', [
+                {
+                    kind: 'lines-added',
+                    groupId: activeGroup?.uuid ?? '',
+                    lines: [ogLineData, ...mirrorLineData].map(cloneLineRecord),
+                },
+            ])
+        }
+        await saveSceneMeta(canvasRenderStore.getState().groupData)
     }
 
     return (

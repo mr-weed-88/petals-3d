@@ -2,8 +2,10 @@ import { useState } from 'react'
 
 import { IconX } from '@tabler/icons-react'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveSceneMeta } from '../../db/storage'
+import { pushHistory } from '../../helpers/historyCapture'
 import { notifyError } from '../../helpers/notify'
+import { snapshotGroups } from '../../helpers/records'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -24,11 +26,28 @@ const DeleteGroups = () => {
         try {
             setLoading(true)
 
+            const before = snapshotGroups(
+                canvasRenderStore.getState().groupData
+            )
+
             deleteSelectedGroups()
             sortGroupsByName()
 
             const updatedGroupData = canvasRenderStore.getState().groupData
-            const response = await saveGroupToIndexDB(updatedGroupData)
+            // Only the index. The line records stay on disk until the next
+            // load sweeps them, which is what makes undo possible at all.
+            const response = await saveSceneMeta(updatedGroupData)
+
+            // The before side still holds the deleted groups with their
+            // `objects` arrays, and their meshes were only hidden, so undo
+            // brings both back.
+            pushHistory('Delete group', [
+                {
+                    kind: 'groups-changed',
+                    before,
+                    after: snapshotGroups(updatedGroupData),
+                },
+            ])
 
             resetSelectedGroups()
 
@@ -53,9 +72,6 @@ const DeleteGroups = () => {
     return (
         <div>
             <div className="relative z-10 font-funnel font-normal text-ink">
-                {/* Enter animation only. Closing unmounts immediately;
-                    the old exit transition was a state flag plus a timer that
-                    could fire after a reopen and shut the new dialog. */}
                 <div className="fixed inset-0 animate-overlay-in bg-overlay/50"></div>
 
                 <div className="fixed inset-0 z-10 overflow-y-auto text-[8px] md:text-[12px]">
@@ -65,12 +81,12 @@ const DeleteGroups = () => {
                                 <div>Delete Groups</div>
                                 <button
                                     onClick={handleClose}
-                                    className="flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[4px] hover:bg-accent/25"
+                                    className="flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[4px] hover:bg-surface-3"
                                 >
                                     <IconX
                                         color="currentColor"
                                         size={16}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 </button>
                             </div>

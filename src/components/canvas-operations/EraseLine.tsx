@@ -2,13 +2,19 @@ import { useRef, useState, useEffect, useCallback } from 'react'
 import * as THREE from 'three'
 import { useFrame, useThree } from '@react-three/fiber'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveLines, saveSceneMeta } from '../../db/storage'
+import { historyBusy, pushHistory } from '../../helpers/historyCapture'
+import { findLineRecord } from '../../helpers/records'
 import { eraseLineType } from '../../config/objectsConfig'
 import { notifySuccess } from '../../helpers/notify'
 
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
-import { isLineMesh, type LineObjectType } from '../../types/domain'
+import {
+    isLineMesh,
+    type LineObjectType,
+    type LineRecord,
+} from '../../types/domain'
 
 function forEachMaterial(
     mesh: THREE.Mesh,
@@ -31,17 +37,34 @@ const EraseLine = () => {
     const highlighted = useRef<Set<THREE.Mesh>>(new Set())
     const [dragging, setDragging] = useState(false)
 
+    // Back to the stroke's own opacity, not to 1: passing over a translucent
+    // line without erasing it would otherwise make it fully opaque.
     const resetHighlight = useCallback(() => {
         highlighted.current.forEach((obj) => {
+            const opacity = isLineMesh(obj) ? obj.userData.opacity : 1
             forEachMaterial(obj, (material) => {
-                material.opacity = 1
+                material.opacity = opacity
+                material.transparent = opacity < 1
+                material.needsUpdate = true
             })
         })
         highlighted.current.clear()
     }, [])
 
+    /**
+     * Runs once per drag, on pointer-up, so everything the eraser passed over
+     * is one history entry rather than one per stroke.
+     */
     const eraseObjects = useCallback(async () => {
+        if (historyBusy()) return
+
+        // Pointer-up fires on the window, so releasing anywhere with the
+        // eraser in hand lands here.
         const totalLines = highlighted.current.size
+        if (totalLines === 0) return
+
+        // Only the erased records are written back, not the whole document.
+        const erased: LineRecord[] = []
 
         highlighted.current.forEach((obj) => {
             if (!obj.parent) return
@@ -50,25 +73,38 @@ const EraseLine = () => {
             obj.visible = false
             obj.userData.is_deleted = true
 
-            const lineUuid = obj.userData.uuid
-            const targetLineData = activeGroup?.objects.find(
-                (line) => line.uuid === lineUuid
+            const targetLineData = findLineRecord(
+                canvasRenderStore.getState().groupData,
+                obj.userData.uuid
             )
             if (targetLineData) {
                 targetLineData.is_deleted = true
+                erased.push(targetLineData)
             }
         })
 
         setGroupData([...canvasRenderStore.getState().groupData])
 
-        await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+        // Flagged rather than removed, so the strokes can come back. They are
+        // dropped from disk on the next load, once the scene rebuild has
+        // purged them from the document.
+        await saveLines(erased)
+        await saveSceneMeta(canvasRenderStore.getState().groupData)
+
+        pushHistory('Erase', [
+            {
+                kind: 'lines-flagged',
+                uuids: erased.map((line) => line.uuid),
+                deleted: true,
+            },
+        ])
 
         if (totalLines >= 1) {
             notifySuccess(`${totalLines} curves erased!`)
         }
 
         highlighted.current.clear()
-    }, [setGroupData, activeGroup])
+    }, [setGroupData])
 
     useEffect(() => {
         const onPointerDown = (event: PointerEvent) => {
@@ -78,11 +114,12 @@ const EraseLine = () => {
             }
         }
 
-        const onPointerUp = () => {
-            if (eraserActive) {
-                setDragging(false)
-                void eraseObjects()
-            }
+        const onPointerUp = (event: PointerEvent) => {
+            if (event.pointerType !== pointerType) return
+            if (!eraserActive) return
+
+            setDragging(false)
+            void eraseObjects()
         }
 
         window.addEventListener('pointerdown', onPointerDown)

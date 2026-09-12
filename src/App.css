@@ -4,64 +4,43 @@
 @config '../tailwind.config.js';
 
 /*
- * The theme (fonts, keyframes, animations, breakpoints) lives in
- * tailwind.config.js, loaded by the @config directive above.
+ * Theme tokens. The only place a UI colour is written; tailwind.config.js maps
+ * each to a semantic class, so components use `bg-surface` and never a hex or a
+ * `dark:` variant. `.dark` is set on <html> by the theme store.
  *
- * Everything that can be expressed as a utility now lives inline on the
- * element that uses it. What remains below is only what a utility cannot
- * reach: document-level resets on html, body and #root, none of which are
- * rendered by React.
- */
-
-/*
- * Theme tokens.
- *
- * These are the only place a UI colour is written. tailwind.config.js maps
- * each one to a semantic class name, so components use `bg-surface` and
- * `text-ink` rather than hex values, and neither needs a `dark:` variant.
- *
- * The matching values live in src/config/theme.ts, which is what the 3D
- * scene reads: three.js needs real colours, not CSS variables. Change one,
- * change the other.
- *
- * `.dark` is set on <html> by the theme store.
- */
-/*
- * Light theme. White ground, with the two darker greens carrying the ink and
- * the accent. The accent is the deep green here rather than a bright mint,
- * because an active control on white has to be dark enough to read.
+ * Fonts, keyframes and animations live in tailwind.config.js. Everything a
+ * utility can express is inline on the element; only document-level resets and
+ * third-party overrides remain in this file.
  */
 :root {
     --c-surface: #ffffff;
-    --c-surface-2: #f2fbf8;
-    --c-surface-3: #e3f6ef;
-    --c-ink: #0a3c30;
-    --c-ink-muted: #247b67;
-    --c-line: #00674f;
+    /* Neutral, like the dark theme's. Tinting the panels and the text green as
+       well left the accent competing with its own surroundings. */
+    --c-surface-2: #f7f7f8;
+    --c-surface-3: #ececee;
+    --c-ink: #18181b;
+    --c-ink-muted: #6b6b72;
+    /* Neutral, and always used at 25%: borders and tracks are structure, not
+       brand. Green is reserved for controls that are actually active. */
+    --c-line: #52525b;
     --c-accent: #00674f;
-    /* Sits on top of --c-accent, so it inverts with it: white on the deep
-       green here, the deep green on the light mint in dark. */
+    /* Sits on top of --c-accent, so it inverts with it. */
     --c-accent-ink: #ffffff;
-    /* The modal backdrop, and the only token deliberately outside the brand
-       greens. A tinted scrim read as a wash of accent over the whole canvas,
-       which drew more attention than the dialog it was meant to sit behind. */
+    /* The modal backdrop. Deliberately outside the brand greens: a tinted
+       scrim read as a wash of accent over the whole canvas. */
     --c-overlay: #9ca3af;
-    /* Pure black and white, unlike the ink tokens, for the joystick parts that
-       must read as neutral next to the axis colours: the orientation cube and
-       the rail a cone slides along. */
+    /* Pure black and white, for the joystick parts that must read as neutral
+       next to the axis colours. */
     --c-contrast: #000000;
-    /* The joystick's handles. The system grab hand cannot be recoloured and
-       disappears against a pale panel on some cursor schemes. */
+    /* The system grab hand cannot be recoloured and disappears against a pale
+       panel on some cursor schemes. */
     --cursor-grab:
         url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cg%20stroke='%23000000'%20fill='none'%3E%3Ccircle%20cx='12'%20cy='12'%20r='7'%20stroke-width='2'/%3E%3Ccircle%20cx='12'%20cy='12'%20r='1.5'%20stroke-width='2'/%3E%3C/g%3E%3C/svg%3E")
             12 12,
         grab;
-    /*
-     * The drawing cursor. A system crosshair cannot be recoloured, and on a
-     * pale canvas it all but vanishes, so it is drawn here instead and swapped
-     * with the theme. The numbers after the url are the hotspot, which has to
-     * sit on the centre of the cross rather than its corner.
-     */
+    /* Drawn rather than the system crosshair, which cannot be recoloured and
+       vanishes on a pale canvas. The trailing numbers are the hotspot, which
+       must sit on the centre of the cross. */
     --cursor-draw:
         url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cpath%20d='M12%203v6M12%2015v6M3%2012h6M15%2012h6'%20stroke='%23000000'%20stroke-width='2'%20stroke-linecap='round'%20fill='none'/%3E%3C/svg%3E")
             12 12,
@@ -71,12 +50,8 @@
 }
 
 /*
- * Dark theme. The surfaces stay neutral near-black: tinting the panels green
- * as well made them compete with the accent, which is the one thing that
- * should read as colour. Nothing is pure #000000, so the panels keep an edge
- * against the tooltip and against a black desktop behind the window.
- *
- * The accent and its ink swap ends of the same green scale, so the same
+ * Nothing is pure black, so panels keep an edge against a black desktop. The
+ * accent and its ink swap ends of the same scale, so the same
  * `bg-accent text-accent-ink` pairing stays legible in both themes.
  */
 .dark {
@@ -84,12 +59,10 @@
     --c-surface-2: #1c1c20;
     --c-surface-3: #26262b;
     --c-ink: #e6e6ea;
-    --c-ink-muted: #8a9a95;
-    --c-line: #3ebb9e;
+    --c-ink-muted: #9a9aa2;
+    --c-line: #a1a1aa;
     --c-accent: #73e6cb;
     --c-accent-ink: #0a3c30;
-    /* Neutral here too, but dark: a light scrim over a near-black editor
-       would lift the whole page rather than push it back. */
     --c-overlay: #18181b;
     --c-contrast: #ffffff;
     --cursor-grab:
@@ -104,10 +77,7 @@
     color-scheme: dark;
 }
 
-/*
- * react-toastify ships its own palette. These are the parts of it that only
- * a variable can reach.
- */
+/* react-toastify parts that only a variable can reach. */
 :root {
     --toastify-font-family: 'Funnel Sans', sans-serif;
     --toastify-toast-bd-radius: 12px;
@@ -121,37 +91,23 @@
 }
 
 /*
- * Toast chrome. These rules cannot move into a component: the library owns
- * the markup, and its own stylesheet is unlayered, so Tailwind utilities
- * passed through `className` would lose to it regardless of source order.
+ * Toast chrome. It cannot move into a component: the library owns the markup
+ * and its stylesheet is unlayered, so utilities passed through `className`
+ * would lose to it regardless of source order.
+ *
+ * The ground is painted on the element rather than through the library's theme
+ * variable, which only applies when a theme prop is passed; without one a toast
+ * fell back to the library's white.
  */
 .Toastify__toast {
-    /*
-     * Painted here rather than through `--toastify-color-light`, because that
-     * variable only reaches the toast via the library's own theme class. Which
-     * theme class it applies depends on a runtime prop, so a toast raised
-     * without one silently fell back to the library's white. Setting the
-     * ground on the element itself makes the theme unconditional.
-     *
-     * `surface-2` rather than `surface`: a notification sits over the canvas,
-     * which is already the plain surface in light mode, so a raised ground is
-     * what separates the two.
-     */
     background: var(--c-surface-2);
     color: var(--c-ink);
-
-    /* The library draws no border, so a toast floats with nothing holding it
-       to the page. This is the hairline the editor's panels use. */
     border: 1px solid color-mix(in oklab, var(--c-line) 25%, transparent);
     font-size: 12px;
     font-weight: 500;
 }
 
-/*
- * The library hardcodes this to white, which is invisible against a light
- * surface. It is the toast's own text colour at the weight the editor gives
- * secondary controls.
- */
+/* The library hardcodes white, invisible against a light surface. */
 .Toastify__close-button {
     color: var(--c-ink);
     opacity: 0.5;
@@ -162,11 +118,8 @@
     opacity: 1;
 }
 
-/*
- * Below 480px the library drops the radius and goes full-bleed. The editor is
- * a fixed-viewport app whose panels stay as floating cards at every width, so
- * the toast keeps its card shape too.
- */
+/* Below 480px the library goes full-bleed. Every panel here stays a floating
+   card at any width, so the toast does too. */
 @media only screen and (max-width: 480px) {
     .Toastify__toast {
         margin-bottom: 8px;
@@ -175,12 +128,10 @@
 }
 
 /*
- * Document-level reset. These target html, body and #root, none of which
- * are rendered by React, so they cannot carry utility classes.
- *
- * The editor is a fixed-viewport app: the page itself never scrolls, and
- * browser gestures (pull-to-refresh, overscroll, double-tap zoom) are
- * suppressed so they cannot fire mid-stroke on a tablet.
+ * Document reset. html, body and #root are not rendered by React, so they
+ * cannot carry utility classes. The editor is a fixed-viewport app: the page
+ * never scrolls, and browser gestures are suppressed so they cannot fire
+ * mid-stroke on a tablet.
  */
 html,
 body {

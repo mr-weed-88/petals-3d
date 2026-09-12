@@ -3,8 +3,10 @@ import { useState, type ChangeEvent } from 'react'
 import { IconX } from '@tabler/icons-react'
 import { v4 as uuidv4 } from 'uuid'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveSceneMeta } from '../../db/storage'
+import { pushHistory } from '../../helpers/historyCapture'
 import { notifyError } from '../../helpers/notify'
+import { snapshotGroups } from '../../helpers/records'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -47,10 +49,23 @@ const AddNewGroups = () => {
                 objects: [],
             }
 
+            const before = snapshotGroups(groupData)
+
             addNewGroup(data)
             sortGroupsByName()
 
-            const response = await saveGroupToIndexDB([...groupData, data])
+            const updatedGroups = canvasRenderStore.getState().groupData
+
+            // A new group is empty, so there is nothing but the index to write.
+            const response = await saveSceneMeta(updatedGroups)
+
+            pushHistory('Create group', [
+                {
+                    kind: 'groups-changed',
+                    before,
+                    after: snapshotGroups(updatedGroups),
+                },
+            ])
 
             if (response) {
                 resetSelectedGroups()
@@ -75,9 +90,6 @@ const AddNewGroups = () => {
     return (
         <div>
             <div className="relative z-10 font-funnel font-normal text-ink">
-                {/* Enter animation only. Closing unmounts immediately;
-                    the old exit transition was a state flag plus a timer that
-                    could fire after a reopen and shut the new dialog. */}
                 <div className="fixed inset-0 animate-overlay-in bg-overlay/50"></div>
 
                 <div className="fixed inset-0 z-10 overflow-y-auto text-[8px] md:text-[12px]">
@@ -87,12 +99,12 @@ const AddNewGroups = () => {
                                 <div>Create new group</div>
                                 <button
                                     onClick={handleClose}
-                                    className="flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[4px] hover:bg-accent/25"
+                                    className="flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[4px] hover:bg-surface-3"
                                 >
                                     <IconX
                                         color="currentColor"
                                         size={16}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 </button>
                             </div>
@@ -104,7 +116,7 @@ const AddNewGroups = () => {
                                     <input
                                         onChange={handleNameChange}
                                         type="text"
-                                        className="block w-full rounded-[8px] border-[1px] border-line/25 bg-surface-2 px-[12px] py-[8px] font-funnel text-[12px] font-semibold text-ink focus:border-accent focus:outline-0"
+                                        className="block w-full rounded-[8px] border-[1px] border-line/25 bg-surface-2 px-[12px] py-[8px] font-funnel text-[12px] font-semibold text-ink focus:border-ink focus:outline-0"
                                         required
                                         disabled={loading}
                                     />

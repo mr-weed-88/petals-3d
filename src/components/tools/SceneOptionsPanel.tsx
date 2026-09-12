@@ -19,7 +19,13 @@ import ToolTip from '../ToolTip'
 import Toggle from '../Toggle'
 import RangeSlider from '../RangeSlider'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveSceneMeta } from '../../db/storage'
+import {
+    historyBusy,
+    noteRenderChange,
+    pushHistory,
+} from '../../helpers/historyCapture'
+import { snapshotGroups } from '../../helpers/records'
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 import type { Group } from '../../types/domain'
@@ -32,7 +38,6 @@ const TABS = [
     { id: 'render' as const, label: 'Render', Icon: IconAdjustments },
 ]
 
-/** Duplicate had no button: the operation, modal and store action all existed. */
 const GROUP_ACTIONS = [
     { id: 'add' as const, label: 'New group', Icon: IconPlus },
     { id: 'rename' as const, label: 'Rename', Icon: IconCursorText },
@@ -121,17 +126,46 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
         }
     }
 
+    /** Writes the index and records one entry, for any group metadata change. */
+    async function commitGroupChange(label: string, change: () => void) {
+        if (historyBusy()) return
+
+        const before = snapshotGroups(canvasRenderStore.getState().groupData)
+        change()
+        const after = canvasRenderStore.getState().groupData
+
+        await saveSceneMeta(after)
+
+        pushHistory(label, [
+            { kind: 'groups-changed', before, after: snapshotGroups(after) },
+        ])
+    }
+
     async function handleGroupVisibility(data: Group) {
-        canvasRenderStore
-            .getState()
-            .updateVisibleGroupProduct(data.uuid, !data.visible)
-        await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+        await commitGroupChange(
+            data.visible ? 'Hide group' : 'Show group',
+            () =>
+                canvasRenderStore
+                    .getState()
+                    .updateVisibleGroupProduct(data.uuid, !data.visible)
+        )
     }
 
     async function handleActiveGroup(data: Group) {
-        canvasRenderStore.getState().setActiveGroup(data)
-        canvasRenderStore.getState().updateActiveGroupProduct(data.uuid)
-        await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+        await commitGroupChange('Active group', () => {
+            const store = canvasRenderStore.getState()
+            store.setActiveGroup(data)
+            store.updateActiveGroupProduct(data.uuid)
+        })
+    }
+
+    // Render settings fire onChange on every movement. noteRenderChange opens
+    // one burst per interaction, so a whole drag is one history entry.
+    function withHistory<T>(label: string, set: (value: T) => void) {
+        return (value: T) => {
+            noteRenderChange(label)
+            set(value)
+        }
     }
 
     const iconSize = isSmall ? 12 : 20
@@ -139,8 +173,6 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
 
     return (
         <div className="absolute top-[72px] right-[12px] z-5 flex w-[200px] flex-col gap-[12px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[8px] font-funnel text-[8px] font-normal text-ink drop-shadow-xl md:w-[260px] md:text-[12px]">
-            {/* A segmented control. The old tabs underlined the inactive one
-                in full-weight ink, so at a glance both read as selected. */}
             <div className="flex gap-[4px] rounded-[8px] bg-surface-2 p-[2px]">
                 {TABS.map((tab) => (
                     <ToolTip
@@ -155,13 +187,13 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                             className={`flex w-full cursor-pointer justify-center rounded-[6px] border-[0px] p-[6px] ${
                                 activeTab === tab.id
                                     ? 'bg-accent text-accent-ink'
-                                    : 'text-ink-muted hover:bg-accent/25 hover:text-ink'
+                                    : 'text-ink-muted hover:bg-surface-3 hover:text-ink'
                             }`}
                         >
                             <tab.Icon
                                 color="currentColor"
                                 size={iconSize}
-                                stroke={1}
+                                stroke={1.5}
                             />
                         </button>
                     </ToolTip>
@@ -185,13 +217,13 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                     className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] ${
                                         action.destructive
                                             ? 'hover:bg-danger hover:text-danger-ink'
-                                            : 'hover:bg-accent/25'
+                                            : 'hover:bg-surface-3'
                                     }`}
                                 >
                                     <action.Icon
                                         color="currentColor"
                                         size={iconSize}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 </button>
                             </ToolTip>
@@ -214,12 +246,11 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                             <div
                                 key={data.uuid}
                                 className={`flex items-center gap-[8px] rounded-[8px] px-[8px] py-[4px] ${
-                                    /* A tint, not a solid accent fill: this
-                                       row carries a checkbox and an eye
-                                       toggle that a solid fill swallows. */
+                                    /* A tint, not a solid fill, which would
+                                       swallow the checkbox and eye toggle. */
                                     data.active
                                         ? 'bg-accent/20 font-semibold'
-                                        : 'hover:bg-accent/10'
+                                        : 'hover:bg-surface-2'
                                 }`}
                             >
                                 <ToolTip
@@ -240,9 +271,8 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                             }
                                         />
 
-                                        {/* Transparent until checked: the tick
-                                            used to paint in ink at all times,
-                                            so unselected groups showed one. */}
+                                        {/* Transparent until checked, or every
+                                            group shows a tick. */}
                                         <div className="flex size-[16px] items-center justify-center rounded-full border-[1px] border-line/25 bg-surface text-transparent peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink">
                                             <IconCheck
                                                 size={12}
@@ -253,8 +283,8 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                     </label>
                                 </ToolTip>
 
-                                {/* Truncated by layout, not by slicing the
-                                    string, so the full name survives on hover. */}
+                                {/* Truncated by layout, not by slicing, so the
+                                    full name survives on hover. */}
                                 <button
                                     onClick={() => void handleActiveGroup(data)}
                                     title={data.name}
@@ -272,7 +302,7 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                         onClick={() =>
                                             void handleGroupVisibility(data)
                                         }
-                                        className={`flex cursor-pointer justify-center rounded-[6px] border-[0px] p-[4px] hover:bg-accent/25 ${
+                                        className={`flex cursor-pointer justify-center rounded-[6px] border-[0px] p-[4px] hover:bg-surface-3 ${
                                             data.visible ? '' : 'text-ink-muted'
                                         }`}
                                     >
@@ -280,13 +310,13 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                             <IconEye
                                                 color="currentColor"
                                                 size={iconSize}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         ) : (
                                             <IconEyeOff
                                                 color="currentColor"
                                                 size={iconSize}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         )}
                                     </button>
@@ -308,7 +338,7 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                             <IconBulb
                                 color="currentColor"
                                 size={iconSize}
-                                stroke={1}
+                                stroke={1.5}
                             />
                         </ToolTip>
 
@@ -319,13 +349,16 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                 min={0}
                                 step={1}
                                 value={lightIntensity}
-                                setUpdatingValue={setLightIntensity}
+                                setUpdatingValue={withHistory(
+                                    'Light intensity',
+                                    setLightIntensity
+                                )}
                                 compact
                             />
                         </div>
 
                         {/* Fixed width and tabular digits, so the row holds
-                            still as the value crosses from one digit to two. */}
+                            still from one digit to two. */}
                         <div className="w-[20px] shrink-0 text-right font-semibold tabular-nums">
                             {lightIntensity}
                         </div>
@@ -337,7 +370,10 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                         <div>Post Process</div>
                         <Toggle
                             checked={postProcess}
-                            onChange={setPostProcess}
+                            onChange={withHistory(
+                                'Post process',
+                                setPostProcess
+                            )}
                             isSmall={isSmall}
                             label="Post Process"
                         />
@@ -347,7 +383,10 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                         <div>Sequential Loading</div>
                         <Toggle
                             checked={sequentialLoading}
-                            onChange={setSequentialLoading}
+                            onChange={withHistory(
+                                'Sequential loading',
+                                setSequentialLoading
+                            )}
                             isSmall={isSmall}
                             label="Sequential Loading"
                         />
@@ -359,7 +398,10 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                         <div className="text-ink-muted">Background</div>
                         <ColorPicker
                             value={canvasBackgroundColor}
-                            onChange={setCanvasBackgroundColor}
+                            onChange={withHistory(
+                                'Background colour',
+                                setCanvasBackgroundColor
+                            )}
                             isSmall={isSmall}
                         />
                     </div>

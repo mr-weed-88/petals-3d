@@ -15,18 +15,17 @@ const UNIT: Record<JoystickAxis, THREE.Vector3> = {
 const workingAxis = new THREE.Vector3()
 const workingQuat = new THREE.Quaternion()
 
-/**
- * One step means a different unit in each mode, so a single setting reads
- * sensibly everywhere: whole world units to move, whole degrees to rotate, and
- * whole percent to scale. A step of 1 is then 1 unit, 1 degree, or 1 percent.
- */
+/** A step is a world unit to move and a degree to rotate, so one setting reads
+    sensibly in all three modes. */
 export const DEG_PER_STEP = Math.PI / 180
-export const SCALE_PER_STEP = 0.01
+
+/** Ten percent per step, compounding. A percent was too fine to resize by hand. */
+export const SCALE_PER_STEP = 0.1
 
 /**
- * The axis to act on. In world space that is the plain unit vector; in local
- * space it is that vector turned by the object's own rotation, which is the
- * same distinction the legacy gizmo draws with setSpace().
+ * The axis to act on: the plain unit vector in world space, or that vector
+ * turned by the object's rotation in local space. Same distinction the legacy
+ * gizmo draws with setSpace().
  */
 function resolveAxis(
     object: THREE.Object3D,
@@ -66,9 +65,29 @@ export function rotateByStep(
     object.quaternion.premultiply(workingQuat).normalize()
 }
 
+/** Steps one event may apply, so a flick or a dropped frame cannot resize the
+    selection by orders of magnitude at once. */
+const MAX_STEPS_PER_EVENT = 20
+
 /**
- * Scales one axis by `steps` whole percent. Scale is always stored relative to
- * an object's own axes, so unlike move and rotate it has no world variant.
+ * What one move event multiplies the scale by.
+ *
+ * Compounding rather than `1 + steps * rate`, for three reasons: the same drag
+ * gives the same result however it is split across events, shrinking is the
+ * exact inverse of growing, and the factor can never reach zero and turn the
+ * selection inside out. The linear form only held while a step was one percent.
+ */
+function scaleFactor(step: number, steps: number): number {
+    const applied = Math.max(
+        -MAX_STEPS_PER_EVENT,
+        Math.min(MAX_STEPS_PER_EVENT, step * steps)
+    )
+    return (1 + SCALE_PER_STEP) ** applied
+}
+
+/**
+ * Scales one axis. Scale is always stored relative to an object's own axes, so
+ * unlike move and rotate it has no world variant.
  */
 export function scaleByStep(
     object: THREE.Object3D,
@@ -76,7 +95,7 @@ export function scaleByStep(
     step: number,
     steps: number
 ): void {
-    const next = object.scale[axis] * (1 + step * steps * SCALE_PER_STEP)
+    const next = object.scale[axis] * scaleFactor(step, steps)
     object.scale[axis] = Math.max(MIN_SCALE, next)
 }
 
@@ -86,7 +105,7 @@ export function scaleUniformByStep(
     step: number,
     steps: number
 ): void {
-    const factor = 1 + step * steps * SCALE_PER_STEP
+    const factor = scaleFactor(step, steps)
     object.scale.set(
         Math.max(MIN_SCALE, object.scale.x * factor),
         Math.max(MIN_SCALE, object.scale.y * factor),
@@ -97,12 +116,9 @@ export function scaleUniformByStep(
 const screenAxis = new THREE.Vector3()
 
 /**
- * Trackball rotation, turning about the screen's axes rather than the world's.
- *
- * Horizontal drag spins about the camera's up vector and vertical about its
- * right vector, which is how orbiting a camera behaves. Using world axes
- * instead made the ball fight the viewer: after orbiting, dragging sideways
- * would tumble the selection rather than spin it.
+ * Trackball rotation about the screen's axes rather than the world's:
+ * horizontal drag spins about the camera's up vector, vertical about its
+ * right. World axes made the ball fight the viewer after an orbit.
  */
 export function freeRotateByStep(
     object: THREE.Object3D,

@@ -150,12 +150,12 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                     <ToolTip text="Color Select" position="right" delay={100}>
                         <button
                             onClick={handleColorChange}
-                            className="flex cursor-pointer items-center justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25"
+                            className="flex cursor-pointer items-center justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-surface-3"
                         >
                             <IconPalette
                                 color={strokeColor}
                                 size={isSmall ? 12 : 20}
-                                stroke={1}
+                                stroke={1.5}
                             />
                         </button>
                     </ToolTip>
@@ -163,7 +163,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                     <ToolTip text="Brushes" position="right" delay={100}>
                         <button
                             onClick={handleStrokeOptions}
-                            className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25`}
+                            className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-surface-3`}
                         >
                             {strokeType === 'taper' && (
                                 <TaperStrokeIcon
@@ -198,35 +198,35 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                             className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                                 openDrawShapeOptions
                                     ? 'bg-accent text-accent-ink'
-                                    : 'hover:bg-accent/25'
+                                    : 'hover:bg-surface-3'
                             }`}
                         >
                             {drawShapeType === 'free_hand' && (
                                 <IconScribble
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                             {drawShapeType === 'straight' && (
                                 <IconLine
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                             {drawShapeType === 'circle' && (
                                 <IconCircle
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                             {drawShapeType === 'arc' && (
                                 <IconVectorSpline
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                         </button>
@@ -241,7 +241,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
                                         opacity={strokeOpacity}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -256,7 +256,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                     <IconArrowsHorizontal
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -323,7 +323,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                     <IconFlipHorizontal
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -470,7 +470,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                     <IconScribble
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -489,7 +489,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                     <IconLine
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -508,7 +508,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                     <IconCircle
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -525,7 +525,7 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                                     <IconVectorSpline
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -578,37 +578,37 @@ const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
                     <button
                         onClick={() => handleMirroring('X', mirror, setMirror)}
                         className={`${
-                            mirror.x ? 'bg-[#DE3163]/50' : 'hover:bg-accent/25'
+                            mirror.x ? 'bg-[#DE3163]/50' : 'hover:bg-surface-3'
                         } cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
                         <IconFlipHorizontal
                             color="#DE3163"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                     <button
                         onClick={() => handleMirroring('Y', mirror, setMirror)}
                         className={`${
-                            mirror.y ? 'bg-[#50C878]/50' : 'hover:bg-accent/25'
+                            mirror.y ? 'bg-[#50C878]/50' : 'hover:bg-surface-3'
                         } cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
                         <IconFlipHorizontal
                             color="#50C878"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                     <button
                         onClick={() => handleMirroring('Z', mirror, setMirror)}
                         className={`${
-                            mirror.z ? 'bg-[#0096FF]/50' : 'hover:bg-accent/25'
+                            mirror.z ? 'bg-[#0096FF]/50' : 'hover:bg-surface-3'
                         } cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
                         <IconFlipHorizontal
                             color="#0096FF"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </div>

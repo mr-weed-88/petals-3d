@@ -6,12 +6,9 @@ export type TransformStyle = 'legacy' | 'joystick'
 const STORAGE_KEY = 'petals3d:editor-prefs'
 
 /**
- * How far one step of a joystick drag moves, rotates or scales the selection:
- * world units, radians, and a scale factor respectively.
- *
- * Fixed steps are why the joystick needs nothing from the camera. Without them
- * a drag would have to be converted from pixels to world units, which differs
- * between perspective and orthographic cameras and changes with distance.
+ * How far one step of a joystick drag moves, rotates or scales the selection.
+ * Fixed steps are why the joystick needs nothing from the camera: converting
+ * pixels to world units differs by projection and changes with distance.
  */
 export const STEP_MIN = 1
 export const STEP_MAX = 1

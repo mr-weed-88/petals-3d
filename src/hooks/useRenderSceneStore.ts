@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { v4 as uuidv4 } from 'uuid'
 import type * as THREE from 'three'
 
+import { cloneLineRecord } from '../helpers/records'
 import type { Group } from '../types/domain'
 
 /** Scene contents, groups and render settings. */
@@ -121,28 +122,55 @@ export const canvasRenderStore = create<CanvasRenderState>((set, get) => ({
     copySelectedGroups: () => {
         const { selectedGroups, groupData } = get()
 
-        const newGroups: Group[] = selectedGroups.map((g) => ({
-            uuid: uuidv4(),
-            name: `${g.name}_copy`,
-            created_at: new Date().toISOString(),
-            deleted_at: null,
-            visible: g.visible,
-            active: false,
-            objects: g.objects,
-        }))
+        const newGroups: Group[] = selectedGroups.map((g) => {
+            const uuid = uuidv4()
+
+            /* Deep copies with fresh ids. Sharing `g.objects` put the same
+               records in two groups, so transforming one moved the other and
+               the index wrote the same line ids under both. */
+            const objects = g.objects.map((line) => {
+                const copy = cloneLineRecord(line)
+                copy.uuid = uuidv4()
+                copy.group_id = uuid
+                return copy
+            })
+
+            return {
+                uuid,
+                name: `${g.name}_copy`,
+                created_at: new Date().toISOString(),
+                deleted_at: null,
+                visible: g.visible,
+                active: false,
+                objects,
+            }
+        })
 
         set({ groupData: [...groupData, ...newGroups] })
     },
 
     deleteSelectedGroups: () => {
         const { selectedGroups, groupData } = get()
-        const selectedIds = selectedGroups.map((g) => g.uuid)
+        const selectedIds = new Set(selectedGroups.map((g) => g.uuid))
 
-        set({
-            groupData: groupData.filter(
-                (group) => !selectedIds.includes(group.uuid)
-            ),
-        })
+        const remaining = groupData.filter(
+            (group) => !selectedIds.has(group.uuid)
+        )
+
+        if (remaining.some((group) => group.active)) {
+            set({ groupData: remaining })
+            return
+        }
+
+        /* The first survivor takes over. An `activeGroup` pointing at a group
+           no longer in the document sends later strokes into an array nothing
+           persists, and several paths assume one exists. */
+        const promoted = remaining.map((group, index) => ({
+            ...group,
+            active: index === 0,
+        }))
+
+        set({ groupData: promoted, activeGroup: promoted[0] ?? null })
     },
 
     updateGroupNamesFromSelected: (name) =>

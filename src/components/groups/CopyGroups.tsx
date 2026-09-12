@@ -2,8 +2,10 @@ import { useState } from 'react'
 
 import { IconX } from '@tabler/icons-react'
 
-import { saveGroupToIndexDB } from '../../db/storage'
+import { saveLines, saveSceneMeta } from '../../db/storage'
+import { pushHistory } from '../../helpers/historyCapture'
 import { notifyError } from '../../helpers/notify'
+import { snapshotGroups } from '../../helpers/records'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -27,13 +29,39 @@ const CopyGroups = () => {
     async function handleCopyGroups() {
         try {
             setLoading(true)
+
+            const before = snapshotGroups(
+                canvasRenderStore.getState().groupData
+            )
+            const existing = new Set(before.map((group) => group.uuid))
+
             copySelectedGroups()
 
             const updatedGroupData = canvasRenderStore.getState().groupData
 
             setCopyGroups(!copyGroups)
 
-            const response = await saveGroupToIndexDB(updatedGroupData)
+            /*
+             * Only the new groups' lines: a copy holds its own records with
+             * fresh ids. Lines first, then the index, which is what the loader
+             * trusts, so a crash between the two leaves unreferenced records
+             * rather than dangling references.
+             */
+            const written = await saveLines(
+                updatedGroupData
+                    .filter((group) => !existing.has(group.uuid))
+                    .flatMap((group) => group.objects)
+            )
+            const response = (await saveSceneMeta(updatedGroupData)) && written
+
+            pushHistory('Duplicate group', [
+                {
+                    kind: 'groups-changed',
+                    before,
+                    after: snapshotGroups(updatedGroupData),
+                },
+            ])
+
             if (response) {
                 resetSelectedGroups()
             } else {
@@ -57,9 +85,6 @@ const CopyGroups = () => {
     return (
         <div>
             <div className="relative z-10 font-funnel font-normal text-ink">
-                {/* Enter animation only. Closing unmounts immediately;
-                    the old exit transition was a state flag plus a timer that
-                    could fire after a reopen and shut the new dialog. */}
                 <div className="fixed inset-0 animate-overlay-in bg-overlay/50"></div>
 
                 <div className="fixed inset-0 z-10 overflow-y-auto text-[8px] md:text-[12px]">
@@ -69,12 +94,12 @@ const CopyGroups = () => {
                                 <div>Copy selected groups</div>
                                 <button
                                     onClick={handleClose}
-                                    className="flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[4px] hover:bg-accent/25"
+                                    className="flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[4px] hover:bg-surface-3"
                                 >
                                     <IconX
                                         color="currentColor"
                                         size={16}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 </button>
                             </div>

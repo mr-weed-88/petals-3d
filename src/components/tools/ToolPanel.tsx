@@ -28,6 +28,7 @@ import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasViewStore } from '../../hooks/useCanvasViewStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
+import { historyStore } from '../../hooks/useHistoryStore'
 
 import ToolTip from '../ToolTip'
 import ToolButton from '../ToolButton'
@@ -133,6 +134,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
     const { setOrbitalLock } = canvasViewStore((state) => state)
 
     const { transformStyle } = editorPrefsStore((state) => state)
+    const historyApplying = historyStore((state) => state.busy)
 
     const { sceneOptions, setSceneOptions, setGroupOptions, setRenderOptions } =
         canvasRenderStore((state) => state)
@@ -142,16 +144,16 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
      * locked for the modes that draw, or a drag would rotate the view instead.
      */
     function handleDraw(button: DrawButton) {
+        // Refused while an undo is applying: the entry restores its own tool
+        // state, and a tool that clears the drawing plane would pull the
+        // ground out from under the patch being reversed.
+        if (historyStore.getState().busy) return
+
         switch (button) {
             case 'pen':
-                /*
-                 * Selects rather than toggles. Finishing a guide already
-                 * switches the pen on, so pressing the button then turned
-                 * drawing off and handed the drag back to the orbit controls,
-                 * which looked exactly like the pen being broken. Leave the
-                 * pen by choosing another tool, or free the camera with the
-                 * orbit lock in the views panel.
-                 */
+                /* Leave the pen by choosing another tool, or free the camera
+                   with the orbit lock. Finishing a guide already switches the
+                   pen on, so a toggle here would turn drawing back off. */
                 setPenActive(!penActive)
                 setOpenDrawShapeOptions(false)
                 setEraserActive(false)
@@ -339,7 +341,11 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
 
     return (
         <>
-            <div className="absolute top-[12px] right-[12px] z-5 flex items-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px] drop-shadow-xl">
+            <div
+                className={`absolute top-[12px] right-[12px] z-5 flex items-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px] drop-shadow-xl ${
+                    historyApplying ? 'opacity-50' : ''
+                }`}
+            >
                 {!dynamicDrawingPlaneMesh && (
                     <ToolTip text="Draw Guide" position="bottom" delay={100}>
                         <div onClick={() => handleDraw('draw_guide')}>
@@ -428,7 +434,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                 <IconBallpen
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             }
                         />
@@ -443,7 +449,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                 <IconEraser
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             }
                         />
@@ -458,7 +464,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                 <IconPointer2
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             }
                         />
@@ -475,7 +481,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                 <IconSparkles
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             }
                         />
@@ -531,7 +537,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                     <IconX
                                         color="#DE3163"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -544,7 +550,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                     <IconCheck
                                         color="var(--c-accent)"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -558,27 +564,27 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                     <ToolTip text="Draw Shape" position="right" delay={100}>
                         <button
                             onClick={handleShapeOptions}
-                            className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                            className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-surface-3"
                         >
                             {drawShapeType === 'free_hand' && (
                                 <IconScribble
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                             {drawShapeType === 'straight' && (
                                 <IconLine
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                             {drawShapeType === 'circle' && (
                                 <IconCircle
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
 
@@ -586,7 +592,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                 <IconVectorSpline
                                     color="currentColor"
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             )}
                         </button>
@@ -608,7 +614,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                     <IconScribble
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -627,7 +633,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                     <IconLine
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -645,7 +651,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                     <IconCircle
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -661,7 +667,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                     <IconVectorSpline
                                         color="currentColor"
                                         size={isSmall ? 12 : 20}
-                                        stroke={1}
+                                        stroke={1.5}
                                     />
                                 }
                             />
@@ -680,12 +686,12 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                         >
                             <button
                                 onClick={handleColorChange}
-                                className="flex cursor-pointer items-center justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25"
+                                className="flex cursor-pointer items-center justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-surface-3"
                             >
                                 <IconPalette
                                     color={lineColor}
                                     size={isSmall ? 12 : 20}
-                                    stroke={1}
+                                    stroke={1.5}
                                 />
                             </button>
                         </ToolTip>
@@ -709,7 +715,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                             <IconArrowsMove
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 20}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         }
                                     />
@@ -724,7 +730,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                             <IconRotate
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 20}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         }
                                     />
@@ -739,7 +745,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                                             <IconResize
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 20}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         }
                                     />
@@ -756,7 +762,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                         >
                             <button
                                 onClick={() => setAxisMode('local')}
-                                className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                                className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-surface-3"
                             >
                                 <GlobalModeIcon
                                     color="currentColor"
@@ -770,7 +776,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                         <ToolTip text="Local axis" position="right" delay={100}>
                             <button
                                 onClick={() => setAxisMode('world')}
-                                className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                                className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-surface-3"
                             >
                                 <LocalModeIcon
                                     color="currentColor"
@@ -784,12 +790,12 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                         <button
                             disabled={copy}
                             onClick={() => setCopy(!copy)}
-                            className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                            className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-surface-3"
                         >
                             <IconCopy
                                 color="currentColor"
                                 size={isSmall ? 12 : 20}
-                                stroke={1}
+                                stroke={1.5}
                             />
                         </button>
                     )}

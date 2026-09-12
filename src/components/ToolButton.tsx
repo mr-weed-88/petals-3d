@@ -12,7 +12,7 @@ const ToolButton = ({ icon, condition }: ToolButtonProps) => {
     return (
         <button
             className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
-                condition ? 'bg-accent text-accent-ink' : 'hover:bg-accent/25'
+                condition ? 'bg-accent text-accent-ink' : 'hover:bg-surface-3'
             }`}
         >
             {icon}

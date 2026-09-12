@@ -4,14 +4,12 @@ import {
     IconBallpen,
     IconBrandGithub,
     IconDeviceDesktop,
-    IconDeviceGamepad,
     IconDownload,
     IconHandFinger,
     IconMenu2,
     IconMoon,
     IconMouse,
     IconSun,
-    IconVector,
 } from '@tabler/icons-react'
 import { v4 as uuidv4 } from 'uuid'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
@@ -22,7 +20,7 @@ import ViewsPanel from '../tools/ViewsPanel'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { themeStore } from '../../hooks/useThemeStore'
-import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
+import { historyStore } from '../../hooks/useHistoryStore'
 import { SCENE } from '../../config/theme'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -40,7 +38,7 @@ import {
     notifyInfo,
     POINTER_PROMPT,
 } from '../../helpers/notify'
-import { loadSceneFromIndexedDB, saveGroupToIndexDB } from '../../db/storage'
+import { loadSceneFromIndexedDB, saveWholeScene } from '../../db/storage'
 import type { Group, PointerType } from '../../types/domain'
 
 /*
@@ -51,12 +49,6 @@ const GESTURE_EXEMPT = '.overflow-y-auto, .custom-scrollbar, .gesture-allowed'
 
 /** Keys that scroll the page, suppressed so they cannot fire mid-stroke. */
 const SCROLL_KEYS = [32, 33, 34, 35, 36, 37, 38, 39, 40]
-
-/** Legacy shows the three.js gizmo on the selection; joystick shows the widget. */
-const TRANSFORM_OPTIONS = [
-    { style: 'joystick' as const, label: 'Joystick', Icon: IconDeviceGamepad },
-    { style: 'legacy' as const, label: 'Legacy transform', Icon: IconVector },
-]
 
 const THEME_OPTIONS = [
     { mode: 'light' as const, label: 'Light', Icon: IconSun },
@@ -91,25 +83,17 @@ const Editor = () => {
         canvasRenderStore((state) => state)
 
     const { mode, resolved, setMode } = themeStore((state) => state)
-    const { transformStyle, setTransformStyle } = editorPrefsStore(
-        (state) => state
-    )
     const { setCanvasBackgroundColor } = canvasRenderStore((state) => state)
+    const historyApplying = historyStore((state) => state.busy)
 
-    /*
-     * The canvas background follows the theme, but the render panel's picker
-     * can still override it. Writing only on theme change lets a custom colour
-     * survive until the next switch.
-     */
+    // Written only on theme change, so a colour picked in the render panel
+    // survives until the next switch.
     useEffect(() => {
         setCanvasBackgroundColor(SCENE[resolved].canvas)
     }, [resolved, setCanvasBackgroundColor])
 
-    /**
-     * Records the input device and clears the prompt. It deliberately picks no
-     * tool: turning Draw Guide on here armed a tool the user never asked for
-     * and locked orbit with it, so the first drag drew instead of rotating.
-     */
+    /** Records the input device and clears the prompt. Deliberately picks no
+        tool: arming one here locks orbit, so the first drag would draw. */
     const choosePointer = useCallback(
         (value: PointerType) => {
             setPointerType(value)
@@ -124,14 +108,14 @@ const Editor = () => {
                 <IconHandFinger
                     color="currentColor"
                     size={16}
-                    stroke={1}
+                    stroke={1.5}
                     className="shrink-0 text-accent"
                 />
                 Select Pointer type first!
             </span>,
             {
                 toastId: POINTER_PROMPT,
-                // It closes itself once a pointer type is chosen, so a close
+                // Closes itself once a pointer type is chosen, so a close
                 // button would only discard the instruction unanswered.
                 closeButton: false,
             }
@@ -148,6 +132,34 @@ const Editor = () => {
         return () =>
             window.removeEventListener('pointerdown', onFirstPointerDown, true)
     }, [choosePointer])
+
+    // Ignored while a text field has focus, so a mistyped group name is still
+    // corrected by the browser's own undo.
+    useEffect(() => {
+        const onKeyDown = (event: KeyboardEvent) => {
+            if (!event.ctrlKey && !event.metaKey) return
+
+            const key = event.key.toLowerCase()
+            if (key !== 'z' && key !== 'y') return
+
+            const target = event.target
+            if (
+                target instanceof HTMLElement &&
+                (target.isContentEditable ||
+                    target.tagName === 'INPUT' ||
+                    target.tagName === 'TEXTAREA')
+            ) {
+                return
+            }
+
+            event.preventDefault()
+            const redo = key === 'y' || event.shiftKey
+            historyStore.getState().request(redo ? 'redo' : 'undo')
+        }
+
+        window.addEventListener('keydown', onKeyDown)
+        return () => window.removeEventListener('keydown', onKeyDown)
+    }, [])
 
     useEffect(() => {
         if (hasRun.current) return
@@ -177,7 +189,9 @@ const Editor = () => {
                 addNewGroup(data)
                 setActiveGroup(data)
 
-                await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
+                // The first save of a new document, so there is nothing to
+                // write incrementally against.
+                await saveWholeScene(canvasRenderStore.getState().groupData)
                 setGroupData(canvasRenderStore.getState().groupData)
             }
         } catch (error) {
@@ -368,12 +382,12 @@ const Editor = () => {
                 <div className="absolute top-[12px] left-[12px] z-5 flex items-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px]">
                     <button
                         onClick={() => setShowOptions(!showOptions)}
-                        className="flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                        className="flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold hover:bg-surface-3"
                     >
                         <IconMenu2
                             color="currentColor"
                             size={isSmall ? 8 : 12}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </div>
@@ -383,7 +397,7 @@ const Editor = () => {
                         <ul>
                             <li
                                 onClick={downloadFile}
-                                className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-accent/25 md:text-[12px]"
+                                className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-surface-3 md:text-[12px]"
                             >
                                 <ToolTip
                                     text="Download model"
@@ -394,7 +408,7 @@ const Editor = () => {
                                         <IconDownload
                                             color="currentColor"
                                             size={isSmall ? 12 : 16}
-                                            stroke={1}
+                                            stroke={1.5}
                                         />
 
                                         <div className="p-[12px] font-funnel font-normal">
@@ -404,7 +418,7 @@ const Editor = () => {
                                 </ToolTip>
                             </li>
 
-                            <li className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-accent/25 md:text-[12px]">
+                            <li className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-surface-3 md:text-[12px]">
                                 <ToolTip
                                     text="GitHub"
                                     position="bottom"
@@ -420,7 +434,7 @@ const Editor = () => {
                                             <IconBrandGithub
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 16}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         </div>
 
@@ -446,13 +460,13 @@ const Editor = () => {
                                             className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                 pointerType === 'pen'
                                                     ? 'bg-accent text-accent-ink'
-                                                    : 'hover:bg-accent/25'
+                                                    : 'hover:bg-surface-3'
                                             }`}
                                         >
                                             <IconBallpen
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 20}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         </button>
                                     </ToolTip>
@@ -469,13 +483,13 @@ const Editor = () => {
                                             className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                 pointerType === 'mouse'
                                                     ? 'bg-accent text-accent-ink'
-                                                    : 'hover:bg-accent/25'
+                                                    : 'hover:bg-surface-3'
                                             }`}
                                         >
                                             <IconMouse
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 20}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         </button>
                                     </ToolTip>
@@ -492,13 +506,13 @@ const Editor = () => {
                                             className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                 pointerType === 'touch'
                                                     ? 'bg-accent text-accent-ink'
-                                                    : 'hover:bg-accent/25'
+                                                    : 'hover:bg-surface-3'
                                             }`}
                                         >
                                             <IconHandFinger
                                                 color="currentColor"
                                                 size={isSmall ? 12 : 20}
-                                                stroke={1}
+                                                stroke={1.5}
                                             />
                                         </button>
                                     </ToolTip>
@@ -506,40 +520,6 @@ const Editor = () => {
                             </li>
 
                             <li className="flex border-b-[1px] border-line/25"></li>
-
-                            <li className="m-[4px] flex items-center justify-between gap-[12px] p-[4px]">
-                                <div>Transform</div>
-                                <div className="flex items-center justify-between gap-[4px]">
-                                    {TRANSFORM_OPTIONS.map((option) => (
-                                        <ToolTip
-                                            key={option.style}
-                                            text={option.label}
-                                            position="bottom"
-                                            delay={100}
-                                        >
-                                            <button
-                                                onClick={() =>
-                                                    setTransformStyle(
-                                                        option.style
-                                                    )
-                                                }
-                                                className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
-                                                    transformStyle ===
-                                                    option.style
-                                                        ? 'bg-accent text-accent-ink'
-                                                        : 'hover:bg-accent/25'
-                                                }`}
-                                            >
-                                                <option.Icon
-                                                    color="currentColor"
-                                                    size={isSmall ? 12 : 20}
-                                                    stroke={1}
-                                                />
-                                            </button>
-                                        </ToolTip>
-                                    ))}
-                                </div>
-                            </li>
 
                             <li className="flex border-b-[1px] border-line/25"></li>
 
@@ -560,13 +540,13 @@ const Editor = () => {
                                                 className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
                                                     mode === option.mode
                                                         ? 'bg-accent text-accent-ink'
-                                                        : 'hover:bg-accent/25'
+                                                        : 'hover:bg-surface-3'
                                                 }`}
                                             >
                                                 <option.Icon
                                                     color="currentColor"
                                                     size={isSmall ? 12 : 20}
-                                                    stroke={1}
+                                                    stroke={1.5}
                                                 />
                                             </button>
                                         </ToolTip>
@@ -596,6 +576,17 @@ const Editor = () => {
                 </div>
 
                 <Joystick />
+
+                {/* Swallows every pointer event while an undo is applying.
+                    Each tool already refuses to act, but an entry touches the
+                    scene, the document and the stacks in turn, and a click
+                    landing between those steps sees an inconsistent editor. */}
+                {historyApplying && (
+                    <div
+                        className="fixed inset-0 z-20 cursor-wait"
+                        aria-hidden="true"
+                    />
+                )}
             </div>
         </>
     )

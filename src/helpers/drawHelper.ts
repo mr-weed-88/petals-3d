@@ -6,6 +6,7 @@ import type {
     Group,
     MaterialType,
     MirrorAxis,
+    LineRecord,
     MirrorState,
     StripId,
     StrokeType,
@@ -22,6 +23,74 @@ export interface GenerateSceneResult {
     newScene: THREE.Scene
 }
 
+/**
+ * Replays one stored stroke into a mesh. The four strips are built and merged
+ * as they were at draw time, which is why the smoothing parameters are stored
+ * per line: reproducing a stroke needs the values it was drawn with.
+ *
+ * The mesh's userData is the record itself, not a copy, so anything wanting a
+ * stable snapshot of a line has to clone it. See helpers/records.ts.
+ */
+export const buildLineMesh = (
+    scene: THREE.Scene,
+    line: LineRecord
+): THREE.Mesh => {
+    const ogGeometries: THREE.BufferGeometry[] = []
+
+    for (const k of [0, 1, 2, 3] as const) {
+        const mesh = createInitialLineMesh(
+            line.color,
+            line.opacity,
+            line.material_type,
+            MAX_POINTS,
+            line.is_mirror,
+            k
+        )
+
+        updateLine(
+            k,
+            line.optimization_threshold,
+            line.smooth_percentage,
+            line.shape_type,
+            mesh,
+            line.width,
+            line.opacity,
+            line.stroke_type,
+            line.color,
+            line.points,
+            line.pressures,
+            line.normals
+        )
+
+        ogGeometries.push(mesh.geometry.clone())
+
+        scene.remove(mesh)
+        mesh.geometry.dispose()
+        disposeMaterial(mesh.material)
+    }
+
+    const mergedGeo = BufferGeometryUtils.mergeGeometries(ogGeometries, false)
+    ogGeometries.forEach((g) => g.dispose())
+
+    mergedGeo.computeVertexNormals()
+    mergedGeo.computeBoundingBox()
+    mergedGeo.computeBoundingSphere()
+
+    const material = getActiveMaterial(
+        line.material_type,
+        line.opacity,
+        line.color
+    )
+    const combinedMesh = new THREE.Mesh(mergedGeo, material)
+
+    combinedMesh.scale.set(line.scale.x, line.scale.y, line.scale.z)
+    combinedMesh.position.copy(line.position)
+    combinedMesh.quaternion.copy(line.rotation)
+    combinedMesh.userData = line
+
+    return combinedMesh
+}
+
 /** Rebuilds every mesh in the scene from the stored line records. */
 export const generateScene = (
     scene: THREE.Scene,
@@ -34,67 +103,7 @@ export const generateScene = (
 
         for (const line of group.objects) {
             if (line.is_deleted) continue
-
-            const currentMesh: THREE.Mesh[] = []
-            const ogGeometries: THREE.BufferGeometry[] = []
-
-            for (const k of [0, 1, 2, 3] as const) {
-                const mesh = createInitialLineMesh(
-                    line.color,
-                    line.opacity,
-                    line.material_type,
-                    MAX_POINTS,
-                    line.is_mirror,
-                    k
-                )
-                currentMesh.push(mesh)
-
-                updateLine(
-                    k,
-                    line.optimization_threshold,
-                    line.smooth_percentage,
-                    line.shape_type,
-                    mesh,
-                    line.width,
-
-                    line.opacity,
-                    line.stroke_type,
-                    line.color,
-                    line.points,
-                    line.pressures,
-                    line.normals
-                )
-
-                ogGeometries.push(mesh.geometry.clone())
-
-                scene.remove(mesh)
-                mesh.geometry.dispose()
-                disposeMaterial(mesh.material)
-            }
-
-            const mergedGeo = BufferGeometryUtils.mergeGeometries(
-                ogGeometries,
-                false
-            )
-            ogGeometries.forEach((g) => g.dispose())
-
-            mergedGeo.computeVertexNormals()
-            mergedGeo.computeBoundingBox()
-            mergedGeo.computeBoundingSphere()
-
-            const material = getActiveMaterial(
-                line.material_type,
-                line.opacity,
-                line.color
-            )
-            const combinedMesh = new THREE.Mesh(mergedGeo, material)
-
-            combinedMesh.scale.set(line.scale.x, line.scale.y, line.scale.z)
-            combinedMesh.position.copy(line.position)
-            combinedMesh.quaternion.copy(line.rotation)
-
-            combinedMesh.userData = line
-            scene.add(combinedMesh)
+            scene.add(buildLineMesh(scene, line))
         }
 
         group.objects = group.objects.filter((line) => !line.is_deleted)
@@ -102,15 +111,6 @@ export const generateScene = (
     }
 
     return { newGeneratedGroups, newScene: scene }
-}
-
-function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
-    const list = Array.isArray(material) ? material : [material]
-    for (const m of list) {
-        const withMap = m as THREE.Material & { map?: THREE.Texture | null }
-        withMap.map?.dispose()
-        m.dispose()
-    }
 }
 
 function updateLine(
@@ -311,6 +311,15 @@ function updateLine(
     geometry.attributes.normal!.needsUpdate = true
     if (geometry.index) geometry.index.needsUpdate = true
     geometry.setDrawRange(0, indices.length)
+}
+
+function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
+    const list = Array.isArray(material) ? material : [material]
+    for (const m of list) {
+        const withMap = m as THREE.Material & { map?: THREE.Texture | null }
+        withMap.map?.dispose()
+        m.dispose()
+    }
 }
 
 /** Scales stroke width by pen pressure, or returns the base width. */

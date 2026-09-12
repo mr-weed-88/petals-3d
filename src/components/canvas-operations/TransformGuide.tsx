@@ -1,9 +1,16 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useCallback } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { TransformControls } from 'three/addons/controls/TransformControls.js'
 
+import { historyBusy, pushHistory } from '../../helpers/historyCapture'
+import {
+    snapshotObjectTransform,
+    type ObjectTransformSnapshot,
+} from '../../helpers/records'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
+import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
+import { transformTargetStore } from '../../hooks/useTransformTargetStore'
 import { isGuideMesh } from '../../types/domain'
 
 interface TransformControlsInternals {
@@ -32,6 +39,12 @@ const TransformGuide = () => {
     const { camera, pointer, raycaster, scene, gl, invalidate } = useThree()
     const { axisMode, pointerType, transformMode } = canvasDrawStore(
         (state) => state
+    )
+
+    const { transformStyle } = editorPrefsStore((state) => state)
+    const setTarget = transformTargetStore((state) => state.setTarget)
+    const setReleaseSelection = transformTargetStore(
+        (state) => state.setReleaseSelection
     )
 
     const transformRef = useRef<TransformControls | null>(null)
@@ -125,6 +138,35 @@ const TransformGuide = () => {
         highlighted.current.clear()
     }
 
+    /*
+     * A guide has no stored record, so the only state a transform changes is
+     * the mesh itself. Both sides are captured as world transforms, which is
+     * what the meshes hold once undo has released the selection.
+     */
+    const transformBefore = useRef<ObjectTransformSnapshot[]>([])
+
+    const captureTransformBefore = () => {
+        transformBefore.current = dummyTarget.current.children.map(
+            snapshotObjectTransform
+        )
+    }
+
+    const commitTransform = () => {
+        const before = transformBefore.current
+        transformBefore.current = []
+        if (before.length === 0) return
+
+        pushHistory('Transform guide', [
+            {
+                kind: 'guide-transformed',
+                before,
+                after: dummyTarget.current.children.map(
+                    snapshotObjectTransform
+                ),
+            },
+        ])
+    }
+
     useEffect(() => {
         const controls = new TransformControls(camera, gl.domElement)
         controls.setSpace(axisMode)
@@ -169,9 +211,11 @@ const TransformGuide = () => {
 
         const handleDragStart = () => {
             isTransformDragging.current = true
+            captureTransformBefore()
         }
         const handleDragEnd = () => {
             isTransformDragging.current = false
+            commitTransform()
         }
         const handleDraggingChanged = (e: { value: unknown }) => {
             isTransformDragging.current = Boolean(e.value)
@@ -180,8 +224,6 @@ const TransformGuide = () => {
         controls.addEventListener('mouseDown', handleDragStart)
         controls.addEventListener('mouseUp', handleDragEnd)
         controls.addEventListener('dragging-changed', handleDraggingChanged)
-
-        scene.add(controls.getHelper())
 
         const dummy = dummyTarget.current
 
@@ -223,19 +265,87 @@ const TransformGuide = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [transformMode, axisMode])
 
+    // The legacy gizmo only attaches in legacy mode. Selection and commit are
+    // the same either way, which is what lets the joystick drive a guide
+    // through exactly the path it drives a line selection through.
     useEffect(() => {
         const controls = transformRef.current
         if (!controls) return
 
-        if (attachedGizmos) {
+        const helper = controls.getHelper()
+
+        if (attachedGizmos && transformStyle === 'legacy') {
             controls.attach(dummyTarget.current)
+            if (!scene.children.includes(helper)) scene.add(helper)
         } else {
             controls.detach()
+            if (scene.children.includes(helper)) scene.remove(helper)
         }
-    }, [attachedGizmos])
+    }, [attachedGizmos, scene, transformStyle])
+
+    // Publishes the proxy Group for the joystick, which lives outside the
+    // canvas and cannot reach into the scene graph.
+    useEffect(() => {
+        if (!attachedGizmos || transformStyle !== 'joystick') {
+            setTarget(null)
+            return
+        }
+
+        setTarget({
+            object: dummyTarget.current,
+            beginDrag: captureTransformBefore,
+            commit: commitTransform,
+        })
+
+        return () => setTarget(null)
+    }, [attachedGizmos, transformStyle, setTarget])
+
+    /**
+     * Hands the selection back to the scene, so each guide holds its own world
+     * transform again. Undo calls this before restoring anything, because a
+     * stored world transform written onto a still-parented mesh composes with
+     * the proxy group's and puts the guide somewhere else.
+     */
+    const releaseSelection = useCallback(() => {
+        const dummy = dummyTarget.current
+        const controls = transformRef.current
+
+        if (controls) {
+            controls.detach()
+            const helper = controls.getHelper()
+            if (scene.children.includes(helper)) scene.remove(helper)
+        }
+
+        dummy.updateMatrixWorld(true)
+
+        for (const child of [...dummy.children]) {
+            child.updateMatrixWorld(true)
+            child.applyMatrix4(dummy.matrixWorld)
+            dummy.remove(child)
+            scene.add(child)
+        }
+
+        if (scene.children.includes(dummy)) scene.remove(dummy)
+
+        dummy.position.set(0, 0, 0)
+        dummy.quaternion.identity()
+        dummy.scale.set(1, 1, 1)
+        dummy.updateMatrixWorld(true)
+
+        highlighted.current.clear()
+        setAttachedGizmos(false)
+        setTarget(null)
+    }, [scene, setTarget])
+
+    useEffect(() => {
+        setReleaseSelection(releaseSelection)
+        return () => setReleaseSelection(null)
+    }, [releaseSelection, setReleaseSelection])
 
     useEffect(() => {
         const onPointerDown = (event: PointerEvent) => {
+            // Selecting mid-apply would reparent a mesh an undo is rewriting.
+            if (historyBusy()) return
             if (event.pointerType !== pointerType) return
 
             const target = event.target

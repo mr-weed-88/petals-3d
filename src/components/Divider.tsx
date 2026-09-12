@@ -4,9 +4,8 @@ export interface DividerProps {
 }
 
 /**
- * Group boundary inside a tool panel. Deliberately shorter than the buttons
- * it sits between: a full-length rule reads as a container edge rather than a
- * pause between groups.
+ * Group boundary inside a tool panel. Shorter than the buttons it sits
+ * between: a full-length rule reads as a container edge, not a pause.
  */
 const Divider = ({ orientation = 'vertical' }: DividerProps) => (
     <div

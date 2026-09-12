@@ -26,16 +26,27 @@
 
 ## Features
 
-The Petals 3D editor (npm package) supports:
-
 - 💯 Free & open-source.
 - 🎨 Infinite, 3d canvas-based whitebox.
 - ✍️ Hand-drawn like style.
 - 😀 Arbitary and Primitive Shapes.
+- 🕹️ On-screen joystick for move, rotate and scale.
 - 🖼️ Export to GLTF.
-- 💾 Local-first support (autosaves to the browser need to enable by developer).
+- 💾 Local-first: every completed action saves to the browser.
 - 🔍 Zoom and panning support.
-- 🔙 Undo / Redo (need to work on it).
+- 🔙 Undo / Redo, 25 steps, with Ctrl+Z and Ctrl+Shift+Z.
+- 🌗 Light and dark themes.
+
+## Running it locally
+
+```bash
+npm install
+npm run dev
+```
+
+`npm run build` type-checks and bundles; `npm run lint` and `npm run format`
+cover the rest. See [ARCHITECTURE.md](./ARCHITECTURE.md) for how the editor is
+put together.
 
 ## Tutorials
 

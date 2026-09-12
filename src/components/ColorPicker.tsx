@@ -102,11 +102,9 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
     const [inputHex, setInputHex] = useState('#000000')
     const [typing, setTyping] = useState(false)
 
-    /*
-     * Hue/sat/val and the hex string are two views of one colour, and each
-     * effect below writes the other's state. This flag marks a write as an
-     * echo so the pair cannot loop.
-     */
+    // Hue/sat/val and the hex string are two views of one colour, and each
+    // effect writes the other's state. This marks a write as an echo, so the
+    // pair cannot loop.
     const syncingRef = useRef(false)
     const [draggingWheel, setDraggingWheel] = useState(false)
     const [draggingSquare, setDraggingSquare] = useState(false)
@@ -334,20 +332,20 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
                     onFocus={handleHexFocus}
                     onBlur={handleHexBlur}
                     maxLength={7}
-                    className="w-28 rounded-[8px] border-[1px] border-line/25 bg-surface-2 px-[8px] py-[6px] text-[8px] font-bold text-ink tabular-nums focus:border-accent focus:outline-0 md:text-[12px]"
+                    className="w-28 rounded-[8px] border-[1px] border-line/25 bg-surface-2 px-[8px] py-[6px] text-[8px] font-bold text-ink tabular-nums focus:border-ink focus:outline-0 md:text-[12px]"
                     placeholder="#000000"
                 />
                 <button
                     type="button"
                     onClick={handleEyedropper}
-                    className="cursor-pointer rounded-full border-[1px] border-line/25 p-[4px] hover:bg-accent/25"
+                    className="cursor-pointer rounded-full border-[1px] border-line/25 p-[4px] hover:bg-surface-3"
                     title="Pick color from screen"
                     tabIndex={0}
                 >
                     <IconColorPicker
                         color="currentColor"
                         size={20}
-                        stroke={1}
+                        stroke={1.5}
                     />
                 </button>
             </div>

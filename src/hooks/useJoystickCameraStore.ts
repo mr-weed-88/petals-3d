@@ -17,12 +17,10 @@ export type AxisScreenMap = Record<JoystickAxis, AxisScreen>
 type Listener = (axes: AxisScreenMap) => void
 
 /**
- * Deliberately not a zustand store.
- *
- * The camera publishes on every frame it moves. Routing that through React
- * state would re-render the joystick sixty times a second while orbiting, to
- * change a handful of transform attributes. Subscribers here write those
- * attributes directly and React never re-renders.
+ * Deliberately not a zustand store. The camera publishes on every frame it
+ * moves, and React state would re-render the joystick sixty times a second
+ * during an orbit to change a few transform attributes. Subscribers write
+ * those attributes directly instead.
  */
 let current: AxisScreenMap = {
     x: { angle: 150, depth: 1, facing: 1 },
@@ -30,12 +28,9 @@ let current: AxisScreenMap = {
     z: { angle: 30, depth: 1, facing: 1 },
 }
 
-/*
- * The camera's own orientation, kept live by the bridge. Free rotation turns
- * about the screen's axes rather than the world's, the way orbiting a camera
- * does, and the orientation cube is shown relative to the viewer. Both need
- * the full rotation, not just where each axis lands.
- */
+/* The camera's orientation, kept live by the bridge. Free rotation and the
+   orientation cube both need the full rotation, not just where each axis
+   lands on screen. */
 export const cameraQuaternion = new THREE.Quaternion()
 
 const listeners = new Set<Listener>()

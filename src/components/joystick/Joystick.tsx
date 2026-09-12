@@ -16,6 +16,7 @@ import ToolTip from '../ToolTip'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
 import { transformTargetStore } from '../../hooks/useTransformTargetStore'
+import { historyBusy } from '../../helpers/historyCapture'
 import {
     cameraQuaternion,
     getAxisScreen,
@@ -55,17 +56,24 @@ import {
     scaleUniformByStep,
 } from './joystickTransform'
 
-/** Pixels of drag that make up one step for the cones and the scale ring. */
-const PIXELS_PER_STEP = 14
+/*
+ * How much drag it takes to emit one step. Lower is faster, and these are the
+ * numbers to change if the widget feels sluggish: a step is one world unit to
+ * move and one percent to scale, so the rate is set here rather than by making
+ * a step mean more.
+ */
+
+/** Pixels of drag per step for the cones and the scale ring. */
+const PIXELS_PER_STEP = 6
+
+/** Pixels per step for the trackball, where a step is a degree. */
+const HUB_PIXELS_PER_STEP = 0.5
 
 /**
- * One pixel of drag per step, so the box turns with the finger. A step is a
- * degree here rather than a world unit, so the cones' rate would have needed
- * well over a thousand pixels for a half turn.
+ * Degrees of sweep around the widget per rotation step. One, so an arc turns
+ * its axis by exactly the angle the finger swept: the handle rotates with the
+ * pointer, and anything else would leave the two pointing different ways.
  */
-const HUB_PIXELS_PER_STEP = 1
-
-/** Degrees of sweep around the widget that make up one rotation step. */
 const DEGREES_PER_STEP = 1
 
 /** Themed, so the handles' cursor is visible on both grounds. */
@@ -95,13 +103,12 @@ const toRadians = (deg: number) => (deg * Math.PI) / 180
 const spareQuaternion = new THREE.Quaternion()
 
 /**
- * A screen widget that transforms the current selection in whole steps.
+ * Transforms the current selection in whole steps.
  *
- * It is flat SVG, not a second 3D scene, but it does turn with the camera: the
- * bridge inside the canvas publishes where each world axis points on screen,
- * and the handles follow. That needs only the camera's orientation, never its
- * lens, so perspective and orthographic behave alike and no pixel-to-world
- * conversion is involved. Dragging is quantised instead.
+ * Flat SVG, not a second 3D scene, but it turns with the camera: the bridge
+ * inside the canvas publishes where each world axis points on screen and the
+ * handles follow. Only the camera's orientation is used, never its lens, so
+ * perspective and orthographic behave alike with no pixel-to-world conversion.
  */
 const Joystick = () => {
     const target = transformTargetStore((state) => state.target)
@@ -121,12 +128,9 @@ const Joystick = () => {
     const viewed = useRef(new THREE.Quaternion())
 
     /**
-     * Redraws the cube from the selection's current rotation, expressed in the
-     * camera's frame so it agrees with what is on screen: turn the selection
-     * towards you and the cube face turns towards you too.
-     *
-     * Written straight to the DOM because it has to follow the camera as well
-     * as the selection, and state would re-render on every frame of an orbit.
+     * Redraws the cube from the selection's rotation in the camera's frame, so
+     * turning the selection towards you turns the cube face towards you.
+     * Written straight to the DOM: state would re-render on every orbit frame.
      */
     function paintCube(): void {
         const object = transformTargetStore.getState().target?.object
@@ -150,10 +154,7 @@ const Joystick = () => {
         }
     }
 
-    /*
-     * Camera updates are written straight to the DOM. Routing them through
-     * state would re-render this component on every frame of an orbit.
-     */
+    // Camera updates go straight to the DOM, for the same reason.
     useEffect(() => {
         const paint = (next: AxisScreenMap) => {
             axes.current = next
@@ -213,12 +214,8 @@ const Joystick = () => {
     }
 
     /**
-     * Turns a pointer position into whole steps for the handle being dragged.
-     *
-     * A cone is measured along the direction it actually points on screen, so
-     * dragging the way the handle faces is what drives its axis. An arc is
-     * measured as a sweep around the widget, which is the gesture its shape
-     * suggests.
+     * Pointer position to whole steps. A cone measures along the direction it
+     * points on screen; an arc measures sweep around the widget.
      */
     function stepsFor(state: DragState, clientX: number, clientY: number) {
         const dx = clientX - state.originX
@@ -262,6 +259,9 @@ const Joystick = () => {
     }
 
     function onDown(e: ReactPointerEvent<SVGElement>) {
+        // The joystick moves the same records an undo is rewriting.
+        if (historyBusy()) return
+
         const handle = e.currentTarget.dataset.handle as HandleKey | undefined
         if (!handle) return
 
@@ -277,6 +277,10 @@ const Joystick = () => {
         const box = svgRef.current?.getBoundingClientRect()
         const pivotX = box ? box.left + box.width / 2 : e.clientX
         const pivotY = box ? box.top + box.height / 2 : e.clientY
+
+        // Lets the transform layer record the starting positions, which it
+        // needs before the drag overwrites them.
+        target?.beginDrag()
 
         drag.current = {
             handle,
@@ -302,11 +306,8 @@ const Joystick = () => {
         // rounding cannot accumulate across a long drag.
         const want = stepsFor(state, e.clientX, e.clientY)
 
-        /*
-         * The arc spins with the pointer so the gesture has something to
-         * follow, and is put back on release. It is only a handle: its resting
-         * place is set by the two cones it spans.
-         */
+        // The arc spins with the pointer and is put back on release; its
+        // resting place is set by the two cones it spans.
         if (state.handle.startsWith('arc')) {
             const node = arcRefs.current.get(
                 state.handle.slice(-1) as JoystickAxis
@@ -314,11 +315,8 @@ const Joystick = () => {
             node?.setAttribute('transform', rotateAbout(want.sweep ?? 0))
         }
 
-        /*
-         * The cone runs along its rail with the pointer, clamped so it cannot
-         * slide off the end. Measured in the rotated frame, so only the
-         * distance along the axis counts and sideways drag is ignored.
-         */
+        // The cone slides along its rail, clamped to the ends. Measured in the
+        // rotated frame, so sideways drag is ignored.
         if (state.handle.startsWith('cone')) {
             const axis = state.handle.slice(-1) as JoystickAxis
             const radians = toRadians(axes.current[axis].angle)
@@ -387,21 +385,17 @@ const Joystick = () => {
     const coneVerb = coneAction === 'move' ? 'Move' : 'Scale'
     const holdingHub = active === 'hub'
 
-    /*
-     * While an arc is being spun everything else stands down, so the one
-     * handle in play is unobstructed and the cube reads clearly behind it.
-     */
+    // While an arc is spun everything else hides, so the handle in play is
+    // unobstructed and the cube reads clearly behind it.
     const spinningAxis = active?.startsWith('arc')
         ? (active.slice(-1) as JoystickAxis)
         : null
 
     return (
-        <div className="absolute right-[12px] bottom-[16px] z-5 flex flex-col items-end gap-[8px] border-1">
+        <div className="absolute right-[12px] bottom-[16px] z-5 flex flex-col items-end gap-[8px]">
             <div className="rounded-full border-[1px] border-line/25 bg-surface p-[6px] drop-shadow-xl">
-                {/*
-                 * Labels are native <title> elements. The app's ToolTip renders
-                 * a div, and a div is not valid inside an svg.
-                 */}
+                {/* Labels are native <title> elements: ToolTip renders a div,
+                    which is not valid inside an svg. */}
                 <svg
                     ref={svgRef}
                     viewBox={`0 0 ${VIEW} ${VIEW}`}
@@ -450,12 +444,9 @@ const Joystick = () => {
                             transform={rotateAbout(initial[axis].angle)}
                             display={spinningAxis ? 'none' : 'inline'}
                         >
-                            {/*
-                             * The rail the cone runs along, shown only while
-                             * that cone is held. It sits inside the rotated
-                             * group, so it lines up with the axis for free and
-                             * needs no geometry of its own per camera change.
-                             */}
+                            {/* The rail, shown only while its cone is held. It
+                                sits inside the rotated group, so it lines up
+                                with the axis for free. */}
                             {active === `cone-${axis}` && (
                                 <line
                                     x1={CENTRE - RAIL_LENGTH}
@@ -470,18 +461,12 @@ const Joystick = () => {
                                 />
                             )}
 
-                            {/*
-                             * Two nested groups: this one takes the drag
-                             * offset along the rail, the inner one holds the
-                             * cone's resting place. Separating them means the
-                             * offset can be set and cleared without disturbing
-                             * the position or the glyph's own rotation.
-                             */}
+                            {/* Two groups: this one takes the drag offset, the
+                                inner one the resting place. Separate, so the
+                                offset clears without disturbing either. */}
                             <g ref={keepSlide(axis)}>
-                                {/*
-                                 * The cone glyph points up, so it is turned a
-                                 * further 90 degrees to face outward.
-                                 */}
+                                {/* The glyph points up, so it is turned 90
+                                    degrees to face outward. */}
                                 <g
                                     transform={`translate(${CENTRE + CONE_DISTANCE} ${CENTRE}) rotate(90)`}
                                     data-handle={`cone-${axis}`}
@@ -524,16 +509,10 @@ const Joystick = () => {
                         </circle>
                     )}
 
-                    {/*
-                     * The trackball, drawn as a cube so its orientation is
-                     * readable. One flat fill for all six faces, so a repaint
-                     * writes only geometry and never a colour. It takes the
-                     * axis colour while an arc is spun, which is what shows
-                     * you which axis that arc is turning. The paths carry no
-                     * `d` here, because paintCube writes it and keeps them in
-                     * step with the selection and the camera without a
-                     * re-render.
-                     */}
+                    {/* The trackball, drawn as a cube so its orientation
+                        reads. One fill for all six faces, so a repaint writes
+                        only geometry; it takes the axis colour while that arc
+                        is spun. paintCube writes each `d`. */}
                     <g
                         fill={
                             spinningAxis
@@ -551,11 +530,8 @@ const Joystick = () => {
                         ))}
                     </g>
 
-                    {/*
-                     * A transparent disc over the cube is the actual handle. It
-                     * is a more forgiving target than the cube's silhouette,
-                     * and it stays one shape as the cube turns.
-                     */}
+                    {/* A transparent disc is the handle: a more forgiving
+                        target than the silhouette, and one shape as it turns. */}
                     <circle
                         cx={CENTRE}
                         cy={CENTRE}
@@ -581,19 +557,19 @@ const Joystick = () => {
                     onClick={() =>
                         setConeAction(coneAction === 'move' ? 'scale' : 'move')
                     }
-                    className="flex cursor-pointer justify-center rounded-[8px] border-[1px] border-line/25 bg-surface p-[8px] text-ink drop-shadow-xl hover:bg-accent/25"
+                    className="flex cursor-pointer justify-center rounded-[8px] border-[1px] border-line/25 bg-surface p-[8px] text-ink drop-shadow-xl hover:bg-surface-3"
                 >
                     {coneAction === 'move' ? (
                         <IconArrowsMove
                             color="currentColor"
                             size={16}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     ) : (
                         <IconArrowsMaximize
                             color="currentColor"
                             size={16}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     )}
                 </button>

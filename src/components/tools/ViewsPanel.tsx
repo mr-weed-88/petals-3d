@@ -12,6 +12,7 @@ import {
 import OrthograhicView from '../svg-icons/OrthograhicView'
 
 import { canvasViewStore } from '../../hooks/useCanvasViewStore'
+import { historyStore } from '../../hooks/useHistoryStore'
 
 import RangeSlider from '../RangeSlider'
 import ToolTip from '../ToolTip'
@@ -25,6 +26,10 @@ export interface ViewsPanelProps {
 
 /** Camera and viewport controls. Nothing here touches drawn geometry. */
 const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
+    const { canUndo, canRedo, busy, request, past, future } = historyStore(
+        (state) => state
+    )
+
     const {
         orbitalLock,
         setOrbitalLock,
@@ -117,13 +122,13 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                         className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             fullScreen
                                 ? 'bg-accent text-accent-ink'
-                                : 'hover:bg-accent/25'
+                                : 'hover:bg-surface-3'
                         }`}
                     >
                         <IconMaximize
                             color="currentColor"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </ToolTip>
@@ -134,7 +139,7 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                         className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             isOrthographic
                                 ? 'bg-accent text-accent-ink'
-                                : 'hover:bg-accent/25'
+                                : 'hover:bg-surface-3'
                         }`}
                     >
                         <OrthograhicView
@@ -151,13 +156,13 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                         className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             showFovSlider && !isOrthographic
                                 ? 'bg-accent text-accent-ink'
-                                : 'hover:bg-accent/25'
+                                : 'hover:bg-surface-3'
                         }`}
                     >
                         <IconPerspective
                             color="currentColor"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </ToolTip>
@@ -170,13 +175,13 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                         className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             showGridOptions
                                 ? 'bg-accent text-accent-ink'
-                                : 'hover:bg-accent/25'
+                                : 'hover:bg-surface-3'
                         }`}
                     >
                         <IconGrid4x4
                             color="currentColor"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </ToolTip>
@@ -187,39 +192,62 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                         className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] font-bold ${
                             orbitalLock
                                 ? 'bg-accent text-accent-ink'
-                                : 'hover:bg-accent/25'
+                                : 'hover:bg-surface-3'
                         }`}
                     >
                         <IconLock
                             color="currentColor"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </ToolTip>
 
                 <Divider orientation="horizontal" />
 
-                <ToolTip text="Undo" position="right" delay={100}>
+                {/* Both disabled while an entry is applying, not just the one
+                    in use: a second request would interleave two sets of
+                    writes over the same records. */}
+                <ToolTip
+                    text={
+                        past.length > 0
+                            ? `Undo ${past[past.length - 1].label} (Ctrl+Z)`
+                            : 'Nothing to undo'
+                    }
+                    position="right"
+                    delay={100}
+                >
                     <button
-                        className={`z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25`}
+                        onClick={() => request('undo')}
+                        disabled={!canUndo || busy}
+                        className="z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-surface-3 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                         <IconArrowBackUp
                             color="currentColor"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </ToolTip>
 
-                <ToolTip text="Redo" position="right" delay={100}>
+                <ToolTip
+                    text={
+                        future.length > 0
+                            ? `Redo ${future[0].label} (Ctrl+Shift+Z)`
+                            : 'Nothing to redo'
+                    }
+                    position="right"
+                    delay={100}
+                >
                     <button
-                        className={`z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25`}
+                        onClick={() => request('redo')}
+                        disabled={!canRedo || busy}
+                        className="z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-surface-3 disabled:cursor-default disabled:opacity-30 disabled:hover:bg-transparent"
                     >
                         <IconArrowForwardUp
                             color="currentColor"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </ToolTip>
@@ -243,39 +271,39 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
                     <button
                         onClick={() => setGridPlaneX(!gridPlaneX)}
                         className={`${
-                            gridPlaneX ? 'bg-axis-x/50' : 'hover:bg-accent/25'
+                            gridPlaneX ? 'bg-axis-x/50' : 'hover:bg-surface-3'
                         } z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
                         <IconGrid4x4
                             color="#DE3163"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
 
                     <button
                         onClick={() => setGridPlaneY(!gridPlaneY)}
                         className={`${
-                            gridPlaneY ? 'bg-axis-y/50' : 'hover:bg-accent/25'
+                            gridPlaneY ? 'bg-axis-y/50' : 'hover:bg-surface-3'
                         } z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
                         <IconGrid4x4
                             color="#50C878"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
 
                     <button
                         onClick={() => setGridPlaneZ(!gridPlaneZ)}
                         className={`${
-                            gridPlaneZ ? 'bg-axis-z/50' : 'hover:bg-accent/25'
+                            gridPlaneZ ? 'bg-axis-z/50' : 'hover:bg-surface-3'
                         } z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold`}
                     >
                         <IconGrid4x4
                             color="#0096FF"
                             size={isSmall ? 12 : 20}
-                            stroke={1}
+                            stroke={1.5}
                         />
                     </button>
                 </div>

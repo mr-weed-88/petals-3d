@@ -35,8 +35,7 @@ export type SceneObjectType = LineObjectType | GuideObjectType
 /*
  * Stored* are the plain-data shapes that survive a structured clone into
  * IndexedDB; the unprefixed ones carry real three.js classes. db/storage.ts
- * converts between them, and mixing the two is what silently flattened
- * reloaded strokes into straight lines.
+ * converts between them. Mixing the two flattens reloaded strokes.
  */
 export interface StoredVec3 {
     x: number
@@ -71,15 +70,19 @@ interface LineRecordBase {
     optimization_threshold: number
     smooth_percentage: number
 
-    pressures: number[]
-
     visible: boolean
 }
 
+/*
+ * Flat Float32Arrays of xyz triplets, not arrays of objects: a structured
+ * clone of a typed array is a memory copy, while cloning tens of thousands of
+ * small objects is not, and that cost is paid on every save.
+ */
 export interface StoredLineRecord extends LineRecordBase {
-    points: StoredVec3[]
-    normals: StoredVec3[]
-    loft_points: StoredVec3[]
+    points: Float32Array
+    normals: Float32Array
+    loft_points: Float32Array
+    pressures: Float32Array
     position: StoredVec3
     rotation: StoredQuat
     scale: StoredVec3
@@ -89,6 +92,7 @@ export interface LineRecord extends LineRecordBase {
     points: THREE.Vector3[]
     normals: THREE.Vector3[]
     loft_points: THREE.Vector3[]
+    pressures: number[]
     position: THREE.Vector3
     rotation: THREE.Quaternion
     scale: THREE.Vector3
@@ -105,8 +109,12 @@ interface GroupBase {
     active: boolean
 }
 
+/**
+ * Metadata plus the ids of its lines, in order. Each line lives under its own
+ * key, so adding a stroke writes one record rather than the whole document.
+ */
 export interface StoredGroup extends GroupBase {
-    objects: StoredLineRecord[]
+    lineIds: string[]
 }
 
 export interface Group extends GroupBase {
