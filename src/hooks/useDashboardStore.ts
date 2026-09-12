@@ -1,14 +1,6 @@
 import { create } from 'zustand'
 
-/**
- * Visibility of the four group modals.
- *
- * This store previously also carried `session`, `activeTab`, `sortBy`,
- * `showSettings`, `isHovered`, `loading`, `newFolderModal` and
- * `newNoteModal`, all left over from the sign-in and dashboard flow that
- * was removed in 4dd500d / 65dc457. None had a single reader, so they
- * were dropped rather than given invented types.
- */
+/** Which group modal is open. Only ever one at a time. */
 export interface DashboardState {
     newGroupModal: boolean
     setNewGroupModal: (bool: boolean) => void

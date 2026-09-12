@@ -21,19 +21,12 @@ export const notifySuccess = (
     toast.success(message, { ...BASE, autoClose: 1000, ...options })
 }
 
-/**
- * Stable id for the pointer prompt, so the same toast can be dismissed once
- * the user answers it and can never be raised twice.
- */
+/** Stable id, so the prompt can be dismissed once answered and never raised twice. */
 export const POINTER_PROMPT = 'pointer-prompt'
 
 /**
  * A standing instruction rather than a notification: it waits until the user
- * acts on it. Callers pass a `toastId` so they can dismiss it themselves.
- *
- * Takes a node rather than a string so the caller can supply its own icon and
- * markup, and the toast reads as part of the editor instead of as the
- * library's stock info banner.
+ * acts on it. Takes a node so the caller can supply its own icon and markup.
  */
 export const notifyInfo = (
     message: ReactNode,
@@ -42,20 +35,18 @@ export const notifyInfo = (
     toast.info(message, {
         ...BASE,
         autoClose: false,
-        // The caller draws its own icon, so the library's would be a second,
-        // unrelated one on the same line.
+        // The caller draws its own icon; the library's would be a second one.
         icon: false,
         ...options,
     })
 }
 
-/** Closes a toast raised with an explicit id. Safe if it is already gone. */
 export const dismissNotice = (id: string): void => {
     toast.dismiss(id)
 }
 
-// Errors stay up until dismissed. A failed write means the user's work is
-// not stored, which they need to see rather than have flash past.
+// Errors stay up until dismissed. A failed write means the user's work is not
+// stored, which they need to see rather than have flash past.
 export const notifyError = (
     message: string,
     options: ToastOptions = {}

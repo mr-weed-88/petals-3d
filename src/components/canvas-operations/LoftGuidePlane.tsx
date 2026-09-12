@@ -21,12 +21,12 @@ import { themeStore } from '../../hooks/useThemeStore'
 import { SCENE } from '../../config/theme'
 
 export interface LoftGuidePlaneProps {
-    /** Called with the finished surface, which becomes the drawing plane. */
     onDrawingFinished: (mesh: THREE.Mesh) => void
 }
 
 const TARGET_SEGMENTS = 128
 
+/** Picks curves, previews a lofted surface between them, and commits it. */
 const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
     const { camera, pointer, raycaster, scene, invalidate } = useThree()
 
@@ -51,7 +51,6 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
     const loftedSurfaceRef = useRef<ControlledLoft | null>(null)
     const prevGenerateLoftRef = useRef(false)
 
-    /** Puts every selected stroke back to its stored colour. */
     const resetHighlightedObjects = useCallback(() => {
         highlighted.current.forEach((obj) => {
             if (!obj.userData.color) return
@@ -101,8 +100,6 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
 
         const guideDataSets: GuideSetInput[] = []
 
-        // Several strokes that join end-to-end become one closed curve;
-        // otherwise each is lofted as its own guide.
         const combinedGuide =
             selectedObjects.length > 1
                 ? detectAndCombineConnectedLoop(selectedObjects)
@@ -181,7 +178,6 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
         invalidate,
     ])
 
-    // Live slider adjustments rebuild the surface in place.
     useEffect(() => {
         const loft = loftedSurfaceRef.current
         if (!loft) return
@@ -199,8 +195,6 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
                 const loft = loftedSurfaceRef.current
                 if (!loft?.mesh) return
 
-                // Freeze the adjustable wireframe into a plain static mesh
-                // that strokes can then be drawn onto.
                 let finalGeometry = loft.mesh.geometry.clone()
                 if (finalGeometry.index !== null) {
                     finalGeometry = finalGeometry.toNonIndexed()
@@ -285,8 +279,6 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
 
         raycaster.setFromCamera(pointer, camera)
 
-        // Selection only runs while loft mode is active, by which point a
-        // group has always been loaded.
         const activeGroupUuid = activeGroup!.uuid
 
         const objectsToTest = scene.children.filter((obj): obj is LineMesh => {

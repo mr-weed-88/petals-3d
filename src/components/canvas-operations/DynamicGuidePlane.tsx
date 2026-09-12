@@ -17,17 +17,13 @@ import {
 import type { StrokeSample } from '../../types/domain'
 
 export interface DynamicGuidePlaneProps {
-    /** Called with the finished ribbon, which becomes the drawing surface. */
     onDrawingFinished: (mesh: THREE.Mesh) => void
 }
 
 /**
- * Stage one of the guide-plane mechanic.
- *
- * Mounts an invisible 4000x4000 plane and keeps it perpendicular to the
- * camera every frame, so it is always a screen-aligned scratch surface.
- * The curve drawn on it is extruded along the plane normal into a ribbon,
- * and that ribbon becomes the surface strokes are drawn onto next.
+ * The core mechanic. An invisible plane is held facing the camera; the curve
+ * you draw on it is extruded into a ribbon, and that ribbon becomes the
+ * surface the next strokes are drawn onto.
  */
 const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
     const { camera, scene, gl } = useThree()
@@ -48,9 +44,6 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
     const OPTIMIZATION_THRESHOLD = 0.01
     const PLANE_WIDTH = 100
 
-    // In-progress stroke state. These are plain bindings rather than refs, so
-    // a re-render mid-stroke resets them. Preserved as-is; see
-    // ARCHITECTURE.md section 10.
     let startPoint: THREE.Vector3 | null = null
     let currentNormal: THREE.Vector3 | null = null
     let isDrawing = false
@@ -59,14 +52,9 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
     let normals: THREE.Vector3[] = []
     let currentMesh: THREE.Mesh | null = null
 
-    // Guide scaffolding has to read against whichever ground is behind it.
     const { resolved } = themeStore((state) => state)
     const color = new THREE.Color(SCENE[resolved].guide)
 
-    /**
-     * Extrudes the drawn curve along the plane normal into a flat ribbon.
-     * This is the wall the user then draws on.
-     */
     function createContinuousRibbonGeometry(
         ribbonPoints: THREE.Vector3[],
         width: number,
@@ -105,7 +93,6 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
 
             sideVector.copy(normal)
 
-            // A degenerate normal leaves no extrusion direction.
             if (sideVector.lengthSq() < 0.0001) {
                 const tempX = new THREE.Vector3(1, 0, 0)
                 const tempY = new THREE.Vector3(0, 1, 0)
@@ -188,7 +175,6 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
         return mesh
     }
 
-    /** Draws the thin preview tube that follows the pointer. */
     function updateLine(
         mesh: THREE.Mesh,
         rawPts: THREE.Vector3[],
@@ -391,8 +377,6 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
         pressures = []
         normals = []
 
-        // The original destructured the result directly, which threw when
-        // the ray missed the plane.
         const intersection = getPlaneIntersection(event)
         if (!intersection) return
 
@@ -495,7 +479,6 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
         }
     }
 
-    /** Turns the drawn curve into a ribbon and hands it upward. */
     function finishRibbon(
         ribbonPoints: THREE.Vector3[],
         ribbonNormals: THREE.Vector3[],
@@ -523,6 +506,7 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
         })
 
         const ribbonMesh = new THREE.Mesh(ribbonGeometry, ribbonMaterial)
+        // Tagged so the eraser and the type guards can find it later.
         ribbonMesh.userData.type = 'OG_GUIDE_PLANE'
         scene.add(ribbonMesh)
 
@@ -601,7 +585,8 @@ const DynamicGuidePlane = ({ onDrawingFinished }: DynamicGuidePlaneProps) => {
         isDrawing = false
     }
 
-    /** Keeps the scratch plane square-on to the camera. */
+    // The plane must face the camera every frame, or a curve drawn after an
+    // orbit lands on a surface angled away from the viewer.
     const SyncCameraFromMain = () => {
         const { camera: mainCamera } = useThree()
         useFrame(() => {

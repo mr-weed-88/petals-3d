@@ -12,27 +12,17 @@ import type {
     StrokeWidth,
 } from '../types/domain'
 
-/** Materials the editor produces. All of them accept `.color` and `.opacity`. */
 export type StrokeMaterial =
     THREE.MeshBasicMaterial | THREE.MeshStandardMaterial
 
 const MAX_POINTS = 50000
-
-/* ------------------------------------------------------------------ *
- * Scene reconstruction
- * ------------------------------------------------------------------ */
 
 export interface GenerateSceneResult {
     newGeneratedGroups: Group[]
     newScene: THREE.Scene
 }
 
-/**
- * Rebuilds every stored stroke into scene geometry.
- *
- * Only the sampled input is persisted, never vertex buffers, so the whole
- * pipeline is replayed here: smooth, thin, frame, extrude, merge.
- */
+/** Rebuilds every mesh in the scene from the stored line records. */
 export const generateScene = (
     scene: THREE.Scene,
     gD: Group[]
@@ -49,12 +39,6 @@ export const generateScene = (
             const ogGeometries: THREE.BufferGeometry[] = []
 
             for (const k of [0, 1, 2, 3] as const) {
-                // The original call passed seven arguments to this
-                // six-parameter function, shifting every value one slot
-                // left: the scene arrived as the stroke colour, a material
-                // name as the vertex budget, and the material factory
-                // returned undefined. It survived only because every
-                // corrupted value was overwritten or disposed below.
                 const mesh = createInitialLineMesh(
                     line.color,
                     line.opacity,
@@ -72,8 +56,7 @@ export const generateScene = (
                     line.shape_type,
                     mesh,
                     line.width,
-                    // Was `line.stroke_opacity`, a field never written by the
-                    // save path, so the vertex colour alpha was undefined.
+
                     line.opacity,
                     line.stroke_type,
                     line.color,
@@ -82,8 +65,6 @@ export const generateScene = (
                     line.normals
                 )
 
-                // Cloned because the source is disposed immediately below
-                // and the merge has to outlive it.
                 ogGeometries.push(mesh.geometry.clone())
 
                 scene.remove(mesh)
@@ -116,7 +97,6 @@ export const generateScene = (
             scene.add(combinedMesh)
         }
 
-        // Soft-deleted strokes are dropped now that the scene is built.
         group.objects = group.objects.filter((line) => !line.is_deleted)
         newGeneratedGroups.push(group)
     }
@@ -133,13 +113,6 @@ function disposeMaterial(material: THREE.Material | THREE.Material[]): void {
     }
 }
 
-/**
- * Builds one face of a stored stroke's tube.
- *
- * The four faces are built as separate meshes and merged afterwards.
- * Generating all four in one geometry produces harsh seams along the
- * shared edges, which become obvious once opacity drops below 1.
- */
 function updateLine(
     stripId: StripId,
     optimizationThreshold: number,
@@ -211,9 +184,6 @@ function updateLine(
     const firstNormal = finalNormals[0] ?? new THREE.Vector3(0, 1, 0)
     const firstTangent = tangents[0] ?? new THREE.Vector3(1, 0, 0)
 
-    // Parallel-transport frame. Recomputing an arbitrary "up" per point
-    // makes the tube twist; rotating each frame from the previous one by
-    // the quaternion between successive tangents keeps it stable.
     const transportedRights: THREE.Vector3[] = []
     const right = new THREE.Vector3()
         .crossVectors(firstNormal, firstTangent)
@@ -343,16 +313,7 @@ function updateLine(
     geometry.setDrawRange(0, indices.length)
 }
 
-/* ------------------------------------------------------------------ *
- * Brush profile
- * ------------------------------------------------------------------ */
-
-/**
- * Half-extents of the brush cross-section.
- *
- * Every branch is covered by the StrokeType union, so unlike the original
- * there is no default case returning undefined dimensions.
- */
+/** Scales stroke width by pen pressure, or returns the base width. */
 export const getAdaptiveStrokeWidth = (
     strokeType: StrokeType,
     pressure: number,
@@ -371,10 +332,7 @@ export const getAdaptiveStrokeWidth = (
     }
 }
 
-/* ------------------------------------------------------------------ *
- * Mirroring
- * ------------------------------------------------------------------ */
-
+/** The axes currently switched on, as a list. */
 export const getActiveMirrorModes = (mirror: MirrorState): MirrorAxis[] => {
     const mirrorString: MirrorAxis[] = []
     if (mirror.x) mirrorString.push('X')
@@ -388,12 +346,7 @@ export interface MirroredSample {
     mirroredNormal: THREE.Vector3
 }
 
-/**
- * Reflects a sample across one axis of the guide plane's local space.
- *
- * The plane's world matrix is cached for the duration of a stroke, so the
- * mirror stays fixed even if the plane moves mid-stroke.
- */
+/** Reflects a sample across one axis so mirrored strokes track the original. */
 export const getMirroredPoint = (
     cachedWorldMatrixInverseRef: { current: THREE.Matrix4 | null },
     cachedWorldMatrixRef: { current: THREE.Matrix4 | null },
@@ -440,15 +393,12 @@ export const getMirroredPoint = (
     }
 }
 
-/* ------------------------------------------------------------------ *
- * Primitive shapes
- * ------------------------------------------------------------------ */
-
 export interface CirclePoints {
     circlePoints: THREE.Vector3[]
     circleNormals: THREE.Vector3[]
 }
 
+/** Circle through the drag, laid flat in the drawing plane. */
 export const generateCirclePointsWorld = (
     center: THREE.Vector3,
     normal: THREE.Vector3,
@@ -499,6 +449,7 @@ export interface ArcPoints {
     arcNormals: THREE.Vector3[]
 }
 
+/** Open arc through the drag, laid flat in the drawing plane. */
 export const generateSemiCircleOpenArcWorld = (
     center: THREE.Vector3,
     normal: THREE.Vector3,
@@ -525,11 +476,7 @@ export const generateSemiCircleOpenArcWorld = (
     return { arcPoints, arcNormals }
 }
 
-/* ------------------------------------------------------------------ *
- * Smoothing, thinning, tension
- * ------------------------------------------------------------------ */
-
-/** Lerps interior points toward the straight line between the endpoints. */
+/** Pulls a curve towards the straight line between its ends. */
 export const applyTensionToPoints = (
     points: THREE.Vector3[],
     tensionValue: number
@@ -567,7 +514,7 @@ function smoothWindow(length: number, percentage: number): number {
     return Math.max(1, Math.min(windowSize, Math.floor((length - 1) / 2)))
 }
 
-/** Moving-average over the points. The jitter reduction behind Stable Stroke. */
+/** Moving average over positions, to take hand jitter out of a stroke. */
 export const smoothPoints = (
     points: THREE.Vector3[],
     percentage: number
@@ -589,13 +536,13 @@ export const smoothPoints = (
             }
         }
 
-        // `count` is at least 1 because j = 0 always lands in range.
         smoothed.push(sum.divideScalar(count))
     }
 
     return smoothed
 }
 
+/** Moving average over scalars, used for the pressure track. */
 export const smoothArray = (arr: number[], percentage: number): number[] => {
     if (percentage === 0 || arr.length < 3) return arr
 
@@ -626,14 +573,7 @@ export interface FilteredStroke {
     filteredNormals: THREE.Vector3[]
 }
 
-/**
- * Drops samples closer together than `tolerance`, so a slow hand does not
- * generate thousands of redundant vertices. First and last are always kept.
- *
- * The original guarded this with a malformed ternary whose `pts.length === 3`
- * branch evaluated to a freshly constructed Vector3, which is always truthy,
- * so at exactly three points no thinning happened at all.
- */
+/** Drops samples closer together than the threshold, keeping the ends. */
 export const filterPoints = (
     pts: THREE.Vector3[],
     pressures: number[],
@@ -674,16 +614,7 @@ export const filterPoints = (
     return { filteredPts, filteredPressures, filteredNormals }
 }
 
-/* ------------------------------------------------------------------ *
- * Mesh and material construction
- * ------------------------------------------------------------------ */
-
-/**
- * An empty mesh sized for the worst case, filled in by `updateLine`.
- *
- * Mirror copies hide every strip but the first, so the mirrored stroke
- * reads as a single surface while it is being drawn.
- */
+/** The mesh a stroke starts as, before any geometry is built. */
 export function createInitialLineMesh(
     strokeColor: string,
     strokeOpacity: number,
@@ -722,7 +653,7 @@ export interface SnappedLine {
     snappedEnd: THREE.Vector3
 }
 
-/** Snaps a drag to the nearest `snapAngle` increment within the plane. */
+/** Straight-line tool: snaps the drag to the nearest axis in the plane. */
 export function getSnappedLinePointsInPlane({
     startPoint,
     currentPoint,
@@ -735,7 +666,7 @@ export function getSnappedLinePointsInPlane({
     normal: THREE.Vector3
     camera: THREE.Camera
     snapAngle?: number
-    /** Accepted for call-site compatibility; the original never used it. */
+
     pointDensity?: number
 }): SnappedLine {
     const delta = new THREE.Vector3().subVectors(currentPoint, startPoint)
@@ -744,7 +675,7 @@ export function getSnappedLinePointsInPlane({
     const planeZ = normal.clone()
 
     const tempX = new THREE.Vector3().crossVectors(planeZ, camera.up)
-    // Looking straight down the plane normal leaves no in-plane X axis.
+
     if (tempX.lengthSq() < 0.0001) {
         tempX
             .set(1, 0, 0)
@@ -780,6 +711,7 @@ export function getSnappedLinePointsInPlane({
     }
 }
 
+/** Maps the chosen material type to a three.js material. */
 export function getActiveMaterial(
     activeMaterialType: MaterialType,
     strokeOpacity: number,

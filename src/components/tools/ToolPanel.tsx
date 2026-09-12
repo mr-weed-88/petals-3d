@@ -38,7 +38,6 @@ import PenOptionsPanel from './PenOptionsPanel'
 import SceneOptionsPanel from './SceneOptionsPanel'
 import { handleShape } from '../../helpers/toolHelper'
 
-/** The mutually exclusive editor modes. */
 type DrawButton =
     | 'pen'
     | 'eraser'
@@ -52,10 +51,10 @@ type DrawButton =
     | 'generate_loft_guide'
 
 export interface ToolPanelProps {
-    /** True below the 768px breakpoint. Drives icon sizing. */
     isSmall: boolean
 }
 
+/** The top tool row: guide tools, drawing tools, scene tools. */
 const ToolPanel = ({ isSmall }: ToolPanelProps) => {
     const {
         copy,
@@ -135,6 +134,10 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
     const { sceneOptions, setSceneOptions, setGroupOptions, setRenderOptions } =
         canvasRenderStore((state) => state)
 
+    /**
+     * Modes are mutually exclusive, so every case clears the others. Orbit is
+     * locked for the modes that draw, or a drag would rotate the view instead.
+     */
     function handleDraw(button: DrawButton) {
         switch (button) {
             case 'pen':
@@ -150,8 +153,6 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                 setGenerateLoftSurface(false)
                 setLoftGuidePlane(false)
 
-                // Read back from the store, because the setter above has not
-                // been reflected in the destructured value yet.
                 setOrbitalLock(canvasDrawStore.getState().penActive)
                 break
 
@@ -699,8 +700,6 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                         />
                     </div>
 
-                    {/* Previously also passed a `bg` prop, which ToolButton
-                        does not accept and never read. */}
                     <div onClick={() => setTransformMode('scale')}>
                         <ToolButton
                             condition={transformMode === 'scale'}
@@ -731,9 +730,6 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                             onClick={() => setAxisMode('world')}
                             className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
                         >
-                            {/* `size` was missing here, so this icon rendered
-                                at the browser default rather than matching
-                                its world-space counterpart above. */}
                             <LocalModeIcon
                                 color="currentColor"
                                 size={isSmall ? 12 : 20}

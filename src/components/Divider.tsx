@@ -4,17 +4,9 @@ export interface DividerProps {
 }
 
 /**
- * Group boundary inside a tool panel.
- *
- * A hairline rather than a `|` character, which is what ToolPanel used to
- * carry: the pipe was drawn at full ink weight, so it competed with the icons
- * it was meant to be quieter than, and its height came from the font's glyph,
- * which left it sitting on the text baseline instead of centred against the
- * buttons. This matches the dividers already used in the burger menu and the
- * scene panel.
- *
- * Short on purpose. Running the full length of the button would read as a
- * container edge rather than as a pause between groups.
+ * Group boundary inside a tool panel. Deliberately shorter than the buttons
+ * it sits between: a full-length rule reads as a container edge rather than a
+ * pause between groups.
  */
 const Divider = ({ orientation = 'vertical' }: DividerProps) => (
     <div

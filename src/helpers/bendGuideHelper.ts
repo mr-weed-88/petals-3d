@@ -1,18 +1,9 @@
 import * as THREE from 'three'
 
-/* ------------------------------------------------------------------ *
- * Core helpers
- * ------------------------------------------------------------------ */
-
-/** Anything that can measure distance to its own kind. Vector2 and Vector3 both fit. */
 interface Measurable<T> {
     distanceTo(other: T): number
 }
 
-/**
- * Drops a trailing point that coincides with the first, so a closed curve
- * is not swept over its seam twice.
- */
 function dropDuplicateLoopEnd<T extends Measurable<T>>(
     arr: T[],
     eps = 1e-9
@@ -40,7 +31,6 @@ function buildPlaneBasisFromNormal(normal: THREE.Vector3): PlaneBasis {
     return { u, v, n }
 }
 
-/** Newell-style normal for an open polyline, taken about its centroid. */
 function estimatePolylineNormal3D(points: THREE.Vector3[]): THREE.Vector3 {
     const centroid = new THREE.Vector3()
     for (const p of points) centroid.add(p)
@@ -56,7 +46,6 @@ function estimatePolylineNormal3D(points: THREE.Vector3[]): THREE.Vector3 {
     return n.lengthSq() > 0 ? n.normalize() : new THREE.Vector3(0, 0, 1)
 }
 
-/** Newell's method for a closed polygon. */
 function estimatePolygonNormal(points: THREE.Vector3[]): THREE.Vector3 {
     let nx = 0
     let ny = 0
@@ -86,11 +75,6 @@ function projectPointsTo2D(
     })
 }
 
-/* ------------------------------------------------------------------ *
- * Adaptive path sampling
- * ------------------------------------------------------------------ */
-
-/** Turn angle at each point. Drives sample density, so corners get more points. */
 function computeCurvature(points: THREE.Vector3[], closed = false): number[] {
     const curvatures: number[] = []
     const n = points.length
@@ -150,7 +134,6 @@ interface SamplePathOptions {
     maxSamples?: number
 }
 
-/** Resamples the rail along a Catmull-Rom curve, denser where it turns harder. */
 function samplePathAdaptiveWithNormals(
     pathPoints: THREE.Vector3[],
     pathNormals: THREE.Vector3[] | null = null,
@@ -232,11 +215,6 @@ function samplePathAdaptiveWithNormals(
     return { points: pts, normals: norms }
 }
 
-/* ------------------------------------------------------------------ *
- * Profile building
- * ------------------------------------------------------------------ */
-
-/** Drops points on near-straight runs, keeping every third so detail survives. */
 function simplifyPolyline2D(
     points: THREE.Vector2[],
     angleThreshold = 0.1,
@@ -267,7 +245,6 @@ interface BuildProfileOptions {
     maxSegments?: number
 }
 
-/** Flattens the drawn profile into the 2D cross-section that gets swept. */
 function buildProfile2DAdaptiveWithNormal(
     guidePoints: THREE.Vector3[],
     guidePointNormals: THREE.Vector3[] | null = null,
@@ -318,28 +295,18 @@ function buildProfile2DAdaptiveWithNormal(
     return simplified
 }
 
-/* ------------------------------------------------------------------ *
- * Plane-locked sweep
- * ------------------------------------------------------------------ */
-
-/** Maps position along the rail, 0..1, to a value. */
 type AlongPathFn = (u: number) => number
 
 interface SweepOptions {
     closedPath?: boolean
     minPathSamples?: number
     maxPathSamples?: number
-    /** Rotation of the profile about the rail, in radians. */
+
     twistFn?: AlongPathFn | null
-    /** Uniform scale of the profile along the rail. */
+
     taperFn?: AlongPathFn | null
 }
 
-/**
- * Sweeps the profile along the rail, holding it perpendicular to the rail's
- * plane rather than to the local tangent. Without that lock the profile
- * rolls as the rail curves and the surface self-intersects.
- */
 function sweepWithPlaneNormal(
     brushPolyline2D: THREE.Vector2[],
     guidePathPoints: THREE.Vector3[],
@@ -402,7 +369,6 @@ function sweepWithPlaneNormal(
             .crossVectors(tangent, pathPlane)
             .normalize()
 
-        // Tangent parallel to the plane normal leaves no unique binormal.
         if (binormal.lengthSq() < 1e-6) {
             binormal = new THREE.Vector3()
                 .crossVectors(tangent, new THREE.Vector3(1, 0, 0))
@@ -460,29 +426,19 @@ function sweepWithPlaneNormal(
     return geometry
 }
 
-/* ------------------------------------------------------------------ *
- * Entry point
- * ------------------------------------------------------------------ */
-
 export interface BendOGGuideOptions {
     minPathSamples?: number
     maxPathSamples?: number
     minProfileSegments?: number
     maxProfileSegments?: number
     closedPath?: boolean
-    /** Surface normals of the profile curve, averaged to find its plane. */
+
     guidePointNormals?: THREE.Vector3[] | null
-    /** Surface normals of the rail, averaged to find its plane. */
+
     guidePathPointNormals?: THREE.Vector3[] | null
 }
 
-/**
- * Sweeps a drawn profile along a drawn rail to produce a bent guide surface.
- *
- * `guidePoints` is the first curve the user drew, kept in the store as
- * `ogGuidePoints`. `guidePathPoints` is the rail drawn in bend mode.
- * Returns null when either curve is too short to sweep.
- */
+/** Sweeps the profile curve along a rail to produce the bent guide surface. */
 export function bendOGGuide(
     guidePoints: THREE.Vector3[] | null,
     guidePathPoints: THREE.Vector3[] | null,

@@ -2,21 +2,11 @@ import * as THREE from 'three'
 
 import type { LineMesh } from '../types/domain'
 
-/* ------------------------------------------------------------------ *
- * Curve sets
- * ------------------------------------------------------------------ */
-
-/** One input curve for a loft, plus whether it forms a closed loop. */
 export interface CurveSet {
     guidePoints: THREE.Vector3[]
     isClosed: boolean
 }
 
-/**
- * A guide set as it arrives from the various shape generators, each of
- * which names its output differently. `normalizeGuideSetNoNormals` reads
- * whichever key is populated.
- */
 export interface GuideSetInput {
     guidePoints?: THREE.Vector3[]
     points?: THREE.Vector3[]
@@ -31,15 +21,7 @@ export interface NormalizedGuideSet {
     isClosed: boolean
 }
 
-/* ------------------------------------------------------------------ *
- * Alignment
- * ------------------------------------------------------------------ */
-
-/**
- * Puts every curve into the same winding and starting position as the
- * first, so corresponding points on adjacent curves line up. Without this
- * the lofted surface twists between curves.
- */
+/** Reverses curves as needed so all run the same way round. */
 export function alignCurvesForLofting(curveSets: CurveSet[]): CurveSet[] {
     if (curveSets.length < 2) return curveSets
 
@@ -78,10 +60,6 @@ export function alignCurvesForLofting(curveSets: CurveSet[]): CurveSet[] {
 
 type SeamDirection = 'normal' | 'reversed'
 
-/**
- * Finds the rotation and winding of a closed curve that best matches the
- * previous one, by trying every possible seam position.
- */
 function alignClosedCurveSeam(
     currentCurve: THREE.Vector3[],
     previousCurve: THREE.Vector3[]
@@ -89,8 +67,6 @@ function alignClosedCurveSeam(
     const numPoints = currentCurve.length
     if (numPoints === 0) return currentCurve
 
-    // A closed curve usually repeats its first point at the end. Drop it
-    // while rotating, then put it back.
     const isLastDuplicate =
         numPoints > 1 &&
         currentCurve[0]!.distanceTo(currentCurve[numPoints - 1]!) < 0.001
@@ -143,7 +119,6 @@ function alignClosedCurveSeam(
     return resultCurve
 }
 
-/** Mean distance between sampled pairs at a given seam offset. */
 function calculateRotatedDistance(
     curve: THREE.Vector3[],
     referenceCurve: THREE.Vector3[],
@@ -170,10 +145,6 @@ function calculateRotatedDistance(
     return totalDistance / sampleCount
 }
 
-/* ------------------------------------------------------------------ *
- * Loop detection
- * ------------------------------------------------------------------ */
-
 interface LoopSegment {
     points: THREE.Vector3[]
     start: THREE.Vector3
@@ -186,12 +157,7 @@ export interface CombinedLoop {
     guidePoints: THREE.Vector3[]
 }
 
-/**
- * Joins several selected strokes end-to-end into a single closed loop.
- *
- * Returns null unless every stroke is consumed and the chain closes, since
- * a partial chain cannot be lofted.
- */
+/** Joins curves that meet end to end into one closed loop. */
 export function detectAndCombineConnectedLoop(
     lineObjects: LineMesh[]
 ): CombinedLoop | null {
@@ -261,7 +227,7 @@ export function detectAndCombineConnectedLoop(
         const ordered = segment.reversed
             ? [...segment.points].reverse()
             : segment.points
-        // The last point of each segment is the first of the next.
+
         combinedPoints.push(...ordered.slice(0, -1))
     }
 
@@ -271,18 +237,11 @@ export function detectAndCombineConnectedLoop(
     return { guidePoints: combinedPoints }
 }
 
-/* ------------------------------------------------------------------ *
- * Resampling
- * ------------------------------------------------------------------ */
-
 export interface ResampledCurve {
     points: THREE.Vector3[]
 }
 
-/**
- * Forces an even point count by inserting a midpoint, which the surface
- * indexing below relies on.
- */
+/** Pads to an even point count, which the surface builder requires. */
 export function ensureEvenCount(
     points: THREE.Vector3[],
     isClosed: boolean
@@ -299,7 +258,6 @@ export function ensureEvenCount(
         return { points: out }
     }
 
-    // Split the longest span, so the inserted point disturbs the shape least.
     let maxLen = -1
     let maxIdx = 0
     for (let i = 0; i < out.length - 1; i++) {
@@ -319,13 +277,7 @@ export function ensureEvenCount(
     return { points: out }
 }
 
-/**
- * Resamples a curve to a fixed point count.
- *
- * Four or more points go through a centripetal Catmull-Rom curve, which
- * preserves circular shapes; fewer fall back to linear interpolation
- * because the spline needs the extra control points.
- */
+/** Redistributes points evenly along a curve by arc length. */
 export function resampleCurveNoNormals(
     points: THREE.Vector3[],
     targetSegments: number,
@@ -380,7 +332,7 @@ const POINT_KEYS: ReadonlyArray<keyof GuideSetInput> = [
     'arcPoints',
 ]
 
-/** Finds whichever point array a guide set populated, and detects closure. */
+/** Brings a set of guide curves to a common point count and direction. */
 export function normalizeGuideSetNoNormals(
     guideSet: GuideSetInput
 ): NormalizedGuideSet {
@@ -409,15 +361,11 @@ export function normalizeGuideSetNoNormals(
     return { points: cleanedPoints, isClosed }
 }
 
-/* ------------------------------------------------------------------ *
- * Surface construction
- * ------------------------------------------------------------------ */
-
 interface LoftSurfaceOptions {
     segments?: number
-    /** 0..1. Biases the interpolation toward one guide curve or the other. */
+
     radial?: number
-    /** 0..1. Below 0.5 pinches the middle, above 0.5 bulges it. */
+
     waist?: number
     subdivisions?: number
 }
@@ -447,8 +395,6 @@ function createLoftedSurface(
     const numGuides = resampledGuides.length
     const numPointsPerCurve = segments
 
-    // Maximum separation between adjacent curves at each point, used to
-    // scale the waist bulge so it stays proportional to the surface.
     const maxDistsPerPair: number[][] = []
     for (let i = 0; i < numGuides - 1; i++) {
         const curve1 = resampledGuides[i]!.points
@@ -555,7 +501,6 @@ function createLoftedSurface(
             indices.push(a, b, c, b, d, c)
         }
 
-        // Stitch the last column back to the first so the tube has no seam.
         if (isClosed) {
             const j = numPointsPerCurve - 1
             const a = i * numPointsPerCurve + j
@@ -578,27 +523,14 @@ function createLoftedSurface(
     return geometry
 }
 
-/* ------------------------------------------------------------------ *
- * Live-adjustable loft
- * ------------------------------------------------------------------ */
-
 export interface ControlledLoftOptions {
     initialRadial?: number
     initialWaist?: number
     initialPolyCount?: number
-    /**
-     * Wireframe colour. Passed in rather than fixed here, so this helper
-     * stays unaware of the theme; the caller reads the palette.
-     */
+
     wireColor?: string
 }
 
-/**
- * A loft surface whose radial bias, waist and resolution can be changed
- * from the sliders without rebuilding the input curves.
- *
- * `mesh` is null when the guide sets cannot produce a surface.
- */
 export interface ControlledLoft {
     mesh: THREE.Mesh | null
     originalGuideSets: GuideSetInput[]
@@ -611,6 +543,7 @@ export interface ControlledLoft {
     dispose: () => void
 }
 
+/** Builds the lofted surface, with radial, waist and poly-count controls. */
 export function createControlledLoftedSurface(
     guideSets: GuideSetInput[],
     options: ControlledLoftOptions = {}
@@ -641,8 +574,6 @@ export function createControlledLoftedSurface(
 
         currentGeometry?.dispose()
 
-        // Squared so the low end of the slider has finer control, where the
-        // difference between 16 and 32 segments is most visible.
         const polySquared = currentPolyCount * currentPolyCount
         const resolution = Math.floor(lerp(16, 128, polySquared))
 

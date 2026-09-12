@@ -4,6 +4,7 @@ import {
     IconAdjustments,
     IconBulb,
     IconCheck,
+    IconCopy,
     IconCursorText,
     IconEye,
     IconEyeOff,
@@ -13,6 +14,8 @@ import {
 } from '@tabler/icons-react'
 
 import ColorPicker from '../ColorPicker'
+import Divider from '../Divider'
+import ToolTip from '../ToolTip'
 import Toggle from '../Toggle'
 import RangeSlider from '../RangeSlider'
 
@@ -24,15 +27,30 @@ import type { Group } from '../../types/domain'
 type SceneTab = 'groups' | 'render'
 type GroupOperation = 'add' | 'rename' | 'copy' | 'delete'
 
+const TABS = [
+    { id: 'groups' as const, label: 'Groups', Icon: IconStack2 },
+    { id: 'render' as const, label: 'Render', Icon: IconAdjustments },
+]
+
+/** Duplicate had no button: the operation, modal and store action all existed. */
+const GROUP_ACTIONS = [
+    { id: 'add' as const, label: 'New group', Icon: IconPlus },
+    { id: 'rename' as const, label: 'Rename', Icon: IconCursorText },
+    { id: 'copy' as const, label: 'Duplicate', Icon: IconCopy },
+    {
+        id: 'delete' as const,
+        label: 'Delete',
+        Icon: IconTrash,
+        destructive: true,
+    },
+]
+
 export interface SceneOptionsPanelProps {
-    /** True below the 768px breakpoint. Drives icon sizing. */
     isSmall: boolean
 }
 
 const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
     const {
-        sceneOptions,
-
         groupOptions,
         setGroupOptions,
 
@@ -116,221 +134,238 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
         await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
     }
 
-    return (
-        <>
-            <div>
-                <div className="absolute top-[72px] right-[12px] z-5 w-[180px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px] drop-shadow-xl md:w-[240px]">
-                    <div className="mb-[8px] flex justify-around">
-                        <div
-                            onClick={() => handleSceneActiveOptions('groups')}
-                            className={`${
-                                groupOptions ? 'border-accent' : 'border-ink'
-                            } cursor-pointer rounded-t-[4px] border-b-[2px] p-[8px] font-bold`}
-                        >
-                            <IconStack2
-                                color="currentColor"
-                                size={isSmall ? 12 : 20}
-                                stroke={1}
-                            />
-                        </div>
+    const iconSize = isSmall ? 12 : 20
+    const activeTab: SceneTab = renderOptions ? 'render' : 'groups'
 
-                        <div
-                            onClick={() => handleSceneActiveOptions('render')}
-                            className={`${
-                                renderOptions ? 'border-accent' : 'border-ink'
-                            } cursor-pointer rounded-t-[4px] border-b-[2px] p-[8px] font-bold`}
+    return (
+        <div className="absolute top-[72px] right-[12px] z-5 flex w-[200px] flex-col gap-[12px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[8px] font-funnel text-[8px] font-normal text-ink drop-shadow-xl md:w-[260px] md:text-[12px]">
+            {/* A segmented control. The old tabs underlined the inactive one
+                in full-weight ink, so at a glance both read as selected. */}
+            <div className="flex gap-[4px] rounded-[8px] bg-surface-2 p-[2px]">
+                {TABS.map((tab) => (
+                    <ToolTip
+                        key={tab.id}
+                        text={tab.label}
+                        position="bottom"
+                        delay={100}
+                        className="flex-1"
+                    >
+                        <button
+                            onClick={() => handleSceneActiveOptions(tab.id)}
+                            className={`flex w-full cursor-pointer justify-center rounded-[6px] border-[0px] p-[6px] ${
+                                activeTab === tab.id
+                                    ? 'bg-accent text-accent-ink'
+                                    : 'text-ink-muted hover:bg-accent/25 hover:text-ink'
+                            }`}
                         >
-                            <IconAdjustments
+                            <tab.Icon
                                 color="currentColor"
-                                size={isSmall ? 12 : 20}
+                                size={iconSize}
                                 stroke={1}
                             />
-                        </div>
+                        </button>
+                    </ToolTip>
+                ))}
+            </div>
+
+            {groupOptions && (
+                <>
+                    <div className="flex justify-center gap-[4px]">
+                        {GROUP_ACTIONS.map((action) => (
+                            <ToolTip
+                                key={action.id}
+                                text={action.label}
+                                position="bottom"
+                                delay={100}
+                            >
+                                <button
+                                    onClick={() =>
+                                        handleGroupOperation(action.id)
+                                    }
+                                    className={`flex cursor-pointer justify-center rounded-[8px] border-[0px] p-[8px] ${
+                                        action.destructive
+                                            ? 'hover:bg-danger hover:text-danger-ink'
+                                            : 'hover:bg-accent/25'
+                                    }`}
+                                >
+                                    <action.Icon
+                                        color="currentColor"
+                                        size={iconSize}
+                                        stroke={1}
+                                    />
+                                </button>
+                            </ToolTip>
+                        ))}
                     </div>
 
-                    {sceneOptions && groupOptions && (
-                        <div className="mb-[8px] flex justify-center">
-                            <div
-                                onClick={() => handleGroupOperation('add')}
-                                className="cursor-pointer rounded-[8px] p-[8px] hover:bg-accent/25"
-                            >
-                                <IconPlus
-                                    color="currentColor"
-                                    size={isSmall ? 12 : 20}
-                                    stroke={1}
-                                />
-                            </div>
-                            <div
-                                onClick={() => handleGroupOperation('rename')}
-                                className="cursor-pointer rounded-[8px] p-[8px] hover:bg-accent/25"
-                            >
-                                <IconCursorText
-                                    color="currentColor"
-                                    size={isSmall ? 12 : 20}
-                                    stroke={1}
-                                />
-                            </div>
-                            <div
-                                onClick={() => handleGroupOperation('delete')}
-                                className="cursor-pointer rounded-[8px] p-[8px] hover:bg-accent/25"
-                            >
-                                <IconTrash
-                                    color="currentColor"
-                                    size={isSmall ? 12 : 20}
-                                    stroke={1}
-                                />
-                            </div>
-                        </div>
-                    )}
+                    <Divider orientation="horizontal" />
 
                     {/* `custom-scrollbar` carries no styles. Editor finds it
                         with closest() to exempt this list from the page-wide
                         gesture and scroll suppression. */}
-                    <div className="custom-scrollbar max-h-[500px] touch-pan-y overflow-y-auto overscroll-contain contain-[layout_style_paint] [-webkit-overflow-scrolling:touch]">
-                        {sceneOptions &&
-                            groupOptions &&
-                            groupData.map((data) => (
-                                <div
-                                    key={data.uuid}
-                                    className="z-5 m-[4px] flex flex-col rounded-[8px] font-funnel text-[8px] font-normal text-ink md:text-[12px]"
+                    <div className="custom-scrollbar flex max-h-[320px] touch-pan-y flex-col gap-[2px] overflow-y-auto overscroll-contain contain-[layout_style_paint] [-webkit-overflow-scrolling:touch]">
+                        {groupData.length === 0 && (
+                            <div className="px-[8px] py-[12px] text-center text-ink-muted">
+                                No groups yet
+                            </div>
+                        )}
+
+                        {groupData.map((data) => (
+                            <div
+                                key={data.uuid}
+                                className={`flex items-center gap-[8px] rounded-[8px] px-[8px] py-[4px] ${
+                                    /* A tint, not a solid accent fill: this
+                                       row carries a checkbox and an eye
+                                       toggle that a solid fill swallows. */
+                                    data.active
+                                        ? 'bg-accent/20 font-semibold'
+                                        : 'hover:bg-accent/10'
+                                }`}
+                            >
+                                <ToolTip
+                                    text="Select"
+                                    position="bottom"
+                                    delay={100}
                                 >
-                                    <div
-                                        className={`${
-                                            data.active
-                                                ? 'bg-accent text-accent-ink'
-                                                : 'bg-surface'
-                                        } flex cursor-pointer items-center justify-between rounded-[8px] px-[8px]`}
-                                    >
-                                        <label className="cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                className="peer sr-only border-[1px]"
-                                                checked={selectedGroups.some(
-                                                    (group) =>
-                                                        group.uuid === data.uuid
-                                                )}
-                                                onChange={(e) =>
-                                                    handleSelectGroup(e, data)
-                                                }
-                                                onFocus={(e) =>
-                                                    e.preventDefault()
-                                                }
-                                            />
-                                            <div
-                                                className={`flex size-[12px] items-center justify-center rounded-[20px] border-[1px] border-line/25 bg-surface peer-checked:bg-accent peer-checked:text-accent-ink md:size-[16px]`}
-                                            >
-                                                <IconCheck
-                                                    size={isSmall ? 8 : 12}
-                                                    color="currentColor"
-                                                    stroke={1}
-                                                />
-                                            </div>
-                                        </label>
-
-                                        <div
-                                            onClick={() =>
-                                                void handleActiveGroup(data)
-                                            }
-                                            className="mx-[8px] w-full p-[4px]"
-                                        >
-                                            {data.name.length > 13
-                                                ? `${data.name.slice(0, 13)}...`
-                                                : data.name}
-                                        </div>
-
-                                        <div
-                                            onClick={() =>
-                                                void handleGroupVisibility(data)
-                                            }
-                                            className="flex items-center justify-between gap-[8px] rounded-[8px] p-[4px]"
-                                        >
-                                            {data.visible ? (
-                                                <IconEye
-                                                    color="currentColor"
-                                                    size={isSmall ? 12 : 20}
-                                                    stroke={1}
-                                                />
-                                            ) : (
-                                                <IconEyeOff
-                                                    color="currentColor"
-                                                    size={isSmall ? 12 : 20}
-                                                    stroke={1}
-                                                />
+                                    <label className="flex cursor-pointer items-center">
+                                        <input
+                                            type="checkbox"
+                                            className="peer sr-only"
+                                            checked={selectedGroups.some(
+                                                (group) =>
+                                                    group.uuid === data.uuid
                                             )}
+                                            onChange={(e) =>
+                                                handleSelectGroup(e, data)
+                                            }
+                                        />
+
+                                        {/* Transparent until checked: the tick
+                                            used to paint in ink at all times,
+                                            so unselected groups showed one. */}
+                                        <div className="flex size-[16px] items-center justify-center rounded-full border-[1px] border-line/25 bg-surface text-transparent peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink">
+                                            <IconCheck
+                                                size={12}
+                                                color="currentColor"
+                                                stroke={2}
+                                            />
                                         </div>
-                                    </div>
-                                </div>
-                            ))}
+                                    </label>
+                                </ToolTip>
+
+                                {/* Truncated by layout, not by slicing the
+                                    string, so the full name survives on hover. */}
+                                <button
+                                    onClick={() => void handleActiveGroup(data)}
+                                    title={data.name}
+                                    className="min-w-0 flex-1 cursor-pointer truncate border-[0px] bg-transparent p-0 text-left text-inherit"
+                                >
+                                    {data.name}
+                                </button>
+
+                                <ToolTip
+                                    text={data.visible ? 'Hide' : 'Show'}
+                                    position="left"
+                                    delay={100}
+                                >
+                                    <button
+                                        onClick={() =>
+                                            void handleGroupVisibility(data)
+                                        }
+                                        className={`flex cursor-pointer justify-center rounded-[6px] border-[0px] p-[4px] hover:bg-accent/25 ${
+                                            data.visible ? '' : 'text-ink-muted'
+                                        }`}
+                                    >
+                                        {data.visible ? (
+                                            <IconEye
+                                                color="currentColor"
+                                                size={iconSize}
+                                                stroke={1}
+                                            />
+                                        ) : (
+                                            <IconEyeOff
+                                                color="currentColor"
+                                                size={iconSize}
+                                                stroke={1}
+                                            />
+                                        )}
+                                    </button>
+                                </ToolTip>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {renderOptions && (
+                <>
+                    <div className="flex items-center gap-[8px]">
+                        <ToolTip
+                            text="Light Intensity"
+                            position="bottom"
+                            delay={100}
+                        >
+                            <IconBulb
+                                color="currentColor"
+                                size={iconSize}
+                                stroke={1}
+                            />
+                        </ToolTip>
+
+                        <div className="min-w-0 flex-1">
+                            <RangeSlider
+                                name="Light Intensity"
+                                max={10}
+                                min={0}
+                                step={1}
+                                value={lightIntensity}
+                                setUpdatingValue={setLightIntensity}
+                                compact
+                            />
+                        </div>
+
+                        {/* Fixed width and tabular digits, so the row holds
+                            still as the value crosses from one digit to two. */}
+                        <div className="w-[20px] shrink-0 text-right font-semibold tabular-nums">
+                            {lightIntensity}
+                        </div>
                     </div>
 
-                    {sceneOptions && renderOptions && (
-                        <div className="z-5 w-full items-center rounded-[12px] bg-surface font-funnel font-normal text-ink">
-                            <div className="flex items-center justify-between border-b-[1px] border-line/25 px-[12px]">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex cursor-pointer gap-[12px] p-[8px] font-bold">
-                                        <IconBulb
-                                            color="currentColor"
-                                            size={isSmall ? 12 : 20}
-                                            stroke={1}
-                                        />
-                                    </div>
+                    <Divider orientation="horizontal" />
 
-                                    <div className="m-[4px] flex items-center">
-                                        <RangeSlider
-                                            name="Light Intensity"
-                                            max={10}
-                                            min={0}
-                                            step={1}
-                                            value={lightIntensity}
-                                            setUpdatingValue={setLightIntensity}
-                                            compact
-                                        />
-                                    </div>
-                                </div>
-                                {/* Fixed width and tabular digits, so the row
-                                    holds still as the value crosses from one
-                                    digit to two. */}
-                                <div className="w-[24px] p-[4px] text-right text-[8px] font-bold tabular-nums md:text-[12px]">
-                                    {lightIntensity}
-                                </div>
-                            </div>
+                    <div className="flex items-center justify-between gap-[12px]">
+                        <div>Post Process</div>
+                        <Toggle
+                            checked={postProcess}
+                            onChange={setPostProcess}
+                            isSmall={isSmall}
+                            label="Post Process"
+                        />
+                    </div>
 
-                            <div className="m-[12px] flex items-center justify-between gap-[12px]">
-                                <div className="text-[8px] md:text-[12px]">
-                                    Post Process
-                                </div>
-                                <Toggle
-                                    checked={postProcess}
-                                    onChange={setPostProcess}
-                                    isSmall={isSmall}
-                                    label="Post Process"
-                                />
-                            </div>
+                    <div className="flex items-center justify-between gap-[12px]">
+                        <div>Sequential Loading</div>
+                        <Toggle
+                            checked={sequentialLoading}
+                            onChange={setSequentialLoading}
+                            isSmall={isSmall}
+                            label="Sequential Loading"
+                        />
+                    </div>
 
-                            <div className="m-[12px] flex items-center justify-between gap-[12px]">
-                                <div className="text-[8px] md:text-[12px]">
-                                    Sequential Loading
-                                </div>
-                                <Toggle
-                                    checked={sequentialLoading}
-                                    onChange={setSequentialLoading}
-                                    isSmall={isSmall}
-                                    label="Sequential Loading"
-                                />
-                            </div>
+                    <Divider orientation="horizontal" />
 
-                            <div className="gesture-allowed border-t-[1px] border-line/25">
-                                <ColorPicker
-                                    value={canvasBackgroundColor}
-                                    onChange={setCanvasBackgroundColor}
-                                    isSmall={isSmall}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </>
+                    <div className="gesture-allowed flex flex-col gap-[8px]">
+                        <div className="text-ink-muted">Background</div>
+                        <ColorPicker
+                            value={canvasBackgroundColor}
+                            onChange={setCanvasBackgroundColor}
+                            isSmall={isSmall}
+                        />
+                    </div>
+                </>
+            )}
+        </div>
     )
 }
 

@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 
 export interface ToolButtonProps {
-    /** The icon element to render. Click handling lives on a wrapping element. */
+    /** Click handling lives on a wrapping element, not here. */
     icon: ReactNode
     /** Whether the tool this button represents is currently active. */
     condition: boolean
 }
 
+/** The canonical panel button. Its classes define the app's hover and active look. */
 const ToolButton = ({ icon, condition }: ToolButtonProps) => {
     return (
         <button

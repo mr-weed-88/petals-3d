@@ -19,14 +19,10 @@ import { bendOGGuide } from '../../helpers/bendGuideHelper'
 import type { StrokeSample } from '../../types/domain'
 
 export interface DynamicBendGuidePlaneProps {
-    /** Called with the swept surface, which becomes the drawing plane. */
     onDrawingFinished: (mesh: THREE.Mesh) => void
 }
 
-/**
- * Bend mode. The profile the user drew first is kept in the store as
- * `ogGuidePoints`; the curve drawn here is the rail it gets swept along.
- */
+/** Draws the rail that an existing guide profile is swept along to bend it. */
 const DynamicBendGuidePlane = ({
     onDrawingFinished,
 }: DynamicBendGuidePlaneProps) => {
@@ -48,8 +44,6 @@ const DynamicBendGuidePlane = ({
     const DISTANCE_THRESHOLD = 0.01
     const OPTIMIZATION_THRESHOLD = 0.01
 
-    // Plain bindings rather than refs, so a re-render mid-stroke resets them.
-    // Preserved as-is; see ARCHITECTURE.md section 10.
     let startPoint: THREE.Vector3 | null = null
     let currentNormal: THREE.Vector3 | null = null
     let isDrawing = false
@@ -58,7 +52,6 @@ const DynamicBendGuidePlane = ({
     let normals: THREE.Vector3[] = []
     let currentMesh: THREE.Mesh | null = null
 
-    // Guide scaffolding has to read against whichever ground is behind it.
     const { resolved } = themeStore((state) => state)
     const color = new THREE.Color(SCENE[resolved].guide)
 
@@ -103,7 +96,6 @@ const DynamicBendGuidePlane = ({
         return mesh
     }
 
-    /** Draws the thin preview tube that follows the pointer. */
     function updateLine(
         mesh: THREE.Mesh,
         rawPts: THREE.Vector3[],
@@ -306,8 +298,6 @@ const DynamicBendGuidePlane = ({
         pressures = []
         normals = []
 
-        // The original destructured the result directly, which threw when
-        // the ray missed the plane.
         const intersection = getPlaneIntersection(event)
         if (!intersection) return
 
@@ -411,7 +401,6 @@ const DynamicBendGuidePlane = ({
         }
     }
 
-    /** Publishes the swept surface and tears down the preview tube. */
     function publishRibbon(wrappedRibbon: THREE.BufferGeometry): void {
         const ribbonMaterial = new THREE.MeshBasicMaterial({
             color: color,
@@ -525,7 +514,6 @@ const DynamicBendGuidePlane = ({
         isDrawing = false
     }
 
-    /** Keeps the scratch plane square-on to the camera. */
     const SyncCameraFromMain = () => {
         const { camera: mainCamera } = useThree()
         useFrame(() => {

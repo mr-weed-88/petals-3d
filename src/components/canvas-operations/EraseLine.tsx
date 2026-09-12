@@ -10,7 +10,6 @@ import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 import { isLineMesh, type LineObjectType } from '../../types/domain'
 
-/** Meshes here are built with a single material, but three.js allows an array. */
 function forEachMaterial(
     mesh: THREE.Mesh,
     fn: (material: THREE.Material) => void
@@ -23,6 +22,7 @@ function forEachMaterial(
     }
 }
 
+/** Raycasts on drag and marks whatever it hits for removal. */
 const EraseLine = () => {
     const { camera, pointer, raycaster, scene } = useThree()
     const { activeGroup, setGroupData } = canvasRenderStore((state) => state)
@@ -50,8 +50,6 @@ const EraseLine = () => {
             obj.visible = false
             obj.userData.is_deleted = true
 
-            // The mesh's userData and the stored record are the same object,
-            // so this second write is only needed when they have diverged.
             const lineUuid = obj.userData.uuid
             const targetLineData = activeGroup?.objects.find(
                 (line) => line.uuid === lineUuid
@@ -101,8 +99,6 @@ const EraseLine = () => {
 
         raycaster.setFromCamera(pointer, camera)
 
-        // Dragging only starts on a pointer-down while the eraser is active,
-        // by which point a group has always been loaded.
         const activeGroupUuid = activeGroup!.uuid
 
         const objectsToCheck = scene.children.filter((obj) => {

@@ -26,40 +26,51 @@
  *
  * `.dark` is set on <html> by the theme store.
  */
+/*
+ * Light theme. White ground, with the two darker greens carrying the ink and
+ * the accent. The accent is the deep green here rather than a bright mint,
+ * because an active control on white has to be dark enough to read.
+ */
 :root {
     --c-surface: #ffffff;
-    --c-surface-2: #f0fbf6;
-    --c-surface-3: #dff6eb;
-    --c-ink: #08221a;
-    --c-ink-muted: #3d6154;
-    --c-line: #2f5548;
-    /* The brand mint. The one colour that does not change between themes;
-       everything else is built around its hue. */
-    --c-accent: #00ffa5;
-    /* Sits on top of --c-accent. Near-black in both themes: the mint is
-       bright enough that dark text is the only readable choice on it. */
-    --c-accent-ink: #00160e;
-    --c-overlay: #0b2a20;
+    --c-surface-2: #f2fbf8;
+    --c-surface-3: #e3f6ef;
+    --c-ink: #0a3c30;
+    --c-ink-muted: #247b67;
+    --c-line: #00674f;
+    --c-accent: #00674f;
+    /* Sits on top of --c-accent, so it inverts with it: white on the deep
+       green here, the deep green on the light mint in dark. */
+    --c-accent-ink: #ffffff;
+    /* The modal backdrop, and the only token deliberately outside the brand
+       greens. A tinted scrim read as a wash of accent over the whole canvas,
+       which drew more attention than the dialog it was meant to sit behind. */
+    --c-overlay: #9ca3af;
 
     color-scheme: light;
 }
 
 /*
- * Neutral near-black, on the same faintly cool grey as the canvas. The mint
- * accent is the only colour in the dark theme; tinting the panels green too
- * made them compete with it. Nothing is pure #000000, so the panels keep an
- * edge against the tooltip and against a black desktop behind the window.
+ * Dark theme. The surfaces stay neutral near-black: tinting the panels green
+ * as well made them compete with the accent, which is the one thing that
+ * should read as colour. Nothing is pure #000000, so the panels keep an edge
+ * against the tooltip and against a black desktop behind the window.
+ *
+ * The accent and its ink swap ends of the same green scale, so the same
+ * `bg-accent text-accent-ink` pairing stays legible in both themes.
  */
 .dark {
     --c-surface: #141417;
     --c-surface-2: #1c1c20;
     --c-surface-3: #26262b;
     --c-ink: #e6e6ea;
-    --c-ink-muted: #8c8c96;
-    --c-line: #3a3a42;
-    --c-accent: #00ffa5;
-    --c-accent-ink: #00160e;
-    --c-overlay: #0a0a0c;
+    --c-ink-muted: #8a9a95;
+    --c-line: #3ebb9e;
+    --c-accent: #73e6cb;
+    --c-accent-ink: #0a3c30;
+    /* Neutral here too, but dark: a light scrim over a near-black editor
+       would lift the whole page rather than push it back. */
+    --c-overlay: #18181b;
 
     color-scheme: dark;
 }

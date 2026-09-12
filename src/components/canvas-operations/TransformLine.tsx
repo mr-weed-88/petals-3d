@@ -10,10 +10,6 @@ import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 import { isLineMesh, type LineMesh, type LineRecord } from '../../types/domain'
 
-/**
- * The gizmo sub-objects are not part of the public TransformControls API.
- * Declared narrowly so the traversal below is typed rather than `any`.
- */
 interface TransformControlsInternals {
     _gizmo: {
         gizmo: {
@@ -22,7 +18,6 @@ interface TransformControlsInternals {
     }
 }
 
-/** Types this tool will select. Includes guide surfaces, unlike the eraser. */
 const SELECTABLE_TYPES: readonly string[] = [
     'LINE',
     'MERGED_LINE',
@@ -44,6 +39,7 @@ function forEachMaterial(
     }
 }
 
+/** Gizmo for moving, rotating and scaling selected strokes. */
 const TransformLine = () => {
     const { camera, pointer, raycaster, scene, gl, invalidate } = useThree()
 
@@ -87,7 +83,6 @@ const TransformLine = () => {
     const tempQuaternion = useMemo(() => new THREE.Quaternion(), [])
     const tempScale = useMemo(() => new THREE.Vector3(), [])
 
-    /** Reparents an object while preserving its world transform. */
     const toLocalSpace = (
         object: THREE.Object3D,
         newParent: THREE.Object3D
@@ -112,7 +107,6 @@ const TransformLine = () => {
         object.scale.copy(tempScale)
     }
 
-    /** Writes the gizmo's world transform back onto the stored records. */
     const updateLineWorldPoints = async () => {
         const worldPosition = new THREE.Vector3()
         const worldQuaternion = new THREE.Quaternion()
@@ -159,8 +153,6 @@ const TransformLine = () => {
         controls.setMode(transformMode)
         transformRef.current = controls
 
-        // setColors takes four positional colours. The original passed a
-        // single object, so none of them were ever applied.
         controls.setColors('#ff0000', '#00ff00', '#0000ff', '#FF5F1F')
 
         controls.showX = true
@@ -171,9 +163,6 @@ const TransformLine = () => {
         const helper = internals._gizmo.gizmo.translate.children
 
         helper.forEach((child) => {
-            // `paramters` is a misspelling of `parameters`, so the second
-            // clause has never matched. Kept as it was: correcting the
-            // spelling would start hiding gizmo parts that are visible today.
             const geometryParams = (
                 child as THREE.Mesh & {
                     geometry?: {
@@ -231,8 +220,6 @@ const TransformLine = () => {
             controls.detach()
             controls.dispose()
 
-            // Hand every selected object back to the scene with its world
-            // transform baked in, so detaching does not move anything.
             const childrenToRestore = [...dummy.children]
             childrenToRestore.forEach((child) => {
                 if (!scene.children.includes(child)) {
@@ -411,8 +398,6 @@ const TransformLine = () => {
 
         raycaster.setFromCamera(pointer, camera)
 
-        // Selection only runs while the tool is active, by which point a
-        // group has always been loaded.
         const activeGroupUuid = activeGroup!.uuid
 
         const objectsToTest = scene.children.filter((obj): obj is LineMesh => {
@@ -444,7 +429,6 @@ const TransformLine = () => {
         if (hasNewHighlight) invalidate()
     })
 
-    // Recolour the current selection.
     useEffect(() => {
         if (dummyTarget.current.children.length === 0) return
 
@@ -457,8 +441,6 @@ const TransformLine = () => {
 
             obj.userData.color = lineColor
             forEachMaterial(obj, (material) => {
-                // material.color is a THREE.Color, so it has to be set
-                // through .set() rather than reassigned to a hex string.
                 if ('color' in material) {
                     ;(material as THREE.MeshBasicMaterial).color.set(lineColor)
                 }
@@ -475,15 +457,12 @@ const TransformLine = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lineColor, selectLines, invalidate])
 
-    // Duplicate the current selection.
     useEffect(() => {
         if (!copy || isCopying.current) return
 
         isCopying.current = true
         setAttachedGizmos(false)
 
-        // Hand the originals back to the scene before cloning, so the clones
-        // are built from world-space geometry.
         const originalObjects = [...dummyTarget.current.children].map(
             (child) => {
                 child.updateMatrixWorld(true)
@@ -558,7 +537,6 @@ const TransformLine = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [copy, scene, selectLines, setCopy, setActiveScene])
 
-    // Fuse the current selection into a single mesh.
     useEffect(() => {
         if (!mergeGeometries || isMerging.current) return
 
@@ -581,7 +559,6 @@ const TransformLine = () => {
 
             if (isLineMesh(mesh) && mesh.userData.type === 'LINE') {
                 if (mesh.userData.group_id === activeGroup?.uuid) {
-                    // Marks the source record as folded into a merged mesh.
                     ;(
                         mesh.userData as LineRecord & { merged?: boolean }
                     ).merged = true
@@ -632,8 +609,6 @@ const TransformLine = () => {
             )
         }
 
-        // Unlike the rest of the app, the merged mesh does use vertex colours,
-        // because the sources it fuses may have had different ones.
         let material: THREE.Material
         switch (activeMaterialType) {
             case 'flat':
@@ -684,8 +659,6 @@ const TransformLine = () => {
         combinedMesh.geometry.computeBoundingBox()
         combinedMesh.geometry.computeBoundingSphere()
 
-        // A merged mesh keeps no source samples, so `generateScene` cannot
-        // rebuild it. It is scene-only: the unmerged sources are what reload.
         const mergedRecord: LineRecord = {
             type: 'MERGED_LINE',
             uuid: combinedMesh.uuid,

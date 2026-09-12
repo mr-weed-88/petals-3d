@@ -4,21 +4,17 @@ import type * as THREE from 'three'
 
 import type { Group } from '../types/domain'
 
+/** Scene contents, groups and render settings. */
 export interface CanvasRenderState {
-    /** Live three.js scene. Null until the Canvas has mounted. */
     activeScene: THREE.Scene | null
     setActiveScene: (obj: THREE.Scene | null) => void
-
-    /* Lighting and render options -------------------------------- */
 
     lightIntensity: number
     setLightIntensity: (value: number) => void
 
-    /** Enables the bloom pass. */
     postProcess: boolean
     setPostProcess: (bool: boolean) => void
 
-    /** Reveals scene objects one at a time on load. */
     sequentialLoading: boolean
     setSequentialLoading: (bool: boolean) => void
 
@@ -27,8 +23,6 @@ export interface CanvasRenderState {
 
     dprValue: number
     setDprValue: (value: number) => void
-
-    /* Panel visibility -------------------------------------------- */
 
     sceneOptions: boolean
     setSceneOptions: (bool: boolean) => void
@@ -45,12 +39,9 @@ export interface CanvasRenderState {
     copyGroups: boolean
     setCopyGroups: (bool: boolean) => void
 
-    /* Groups ------------------------------------------------------ */
-
     groupData: Group[]
     setGroupData: (data: Group[]) => void
 
-    /** The group new strokes are added to. Null only before first load. */
     activeGroup: Group | null
     setActiveGroup: (value: Group | null) => void
 
@@ -66,7 +57,6 @@ export interface CanvasRenderState {
     updateVisibleGroupProduct: (uuid: string, visiblity: boolean) => void
     updateActiveGroupProduct: (uuid: string) => void
 
-    /** Orders groups by creation time, oldest first. */
     sortGroupsByName: () => void
 }
 
@@ -99,8 +89,7 @@ export const canvasRenderStore = create<CanvasRenderState>((set, get) => ({
     setRenderOptions: (bool) => set({ renderOptions: bool }),
 
     renderMode: false,
-    // Previously assigned to `renderOptions`, the key belonging to the setter
-    // below it, so `renderMode` could never change.
+
     setRenderMode: (bool) => set({ renderMode: bool }),
 
     copyGroups: false,

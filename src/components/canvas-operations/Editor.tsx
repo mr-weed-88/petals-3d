@@ -39,17 +39,15 @@ import {
 import { loadSceneFromIndexedDB, saveGroupToIndexDB } from '../../db/storage'
 import type { Group, PointerType } from '../../types/domain'
 
-/**
- * Containers that keep native scrolling and browser gestures. Matched with
- * `closest()` below. `custom-scrollbar` and `gesture-allowed` carry no
- * styles and exist only as markers for this selector.
+/*
+ * Containers that keep native scrolling and browser gestures. `custom-scrollbar`
+ * and `gesture-allowed` carry no styles and exist only as markers for this.
  */
 const GESTURE_EXEMPT = '.overflow-y-auto, .custom-scrollbar, .gesture-allowed'
 
 /** Keys that scroll the page, suppressed so they cannot fire mid-stroke. */
 const SCROLL_KEYS = [32, 33, 34, 35, 36, 37, 38, 39, 40]
 
-/** The three theme choices offered in the burger menu. */
 const THEME_OPTIONS = [
     { mode: 'light' as const, label: 'Light', Icon: IconSun },
     { mode: 'dark' as const, label: 'Dark', Icon: IconMoon },
@@ -85,23 +83,19 @@ const Editor = () => {
     const { mode, resolved, setMode } = themeStore((state) => state)
     const { setCanvasBackgroundColor } = canvasRenderStore((state) => state)
 
-    /**
-     * The canvas background follows the theme, but the picker in the render
-     * panel can still override it. Writing only when the theme changes means
-     * a custom colour survives until the next theme switch.
+    /*
+     * The canvas background follows the theme, but the render panel's picker
+     * can still override it. Writing only on theme change lets a custom colour
+     * survive until the next switch.
      */
     useEffect(() => {
         setCanvasBackgroundColor(SCENE[resolved].canvas)
     }, [resolved, setCanvasBackgroundColor])
 
     /**
-     * Records the input device and clears the prompt. The first pointer to
-     * touch the app answers it implicitly; the burger menu answers it
-     * explicitly. Either way the prompt has served its purpose.
-     *
-     * It deliberately picks no tool. Turning Draw Guide on here meant the app
-     * armed a tool the user never asked for, and locked the orbit controls
-     * with it, so the first drag drew instead of rotating the view.
+     * Records the input device and clears the prompt. It deliberately picks no
+     * tool: turning Draw Guide on here armed a tool the user never asked for
+     * and locked orbit with it, so the first drag drew instead of rotating.
      */
     const choosePointer = useCallback(
         (value: PointerType) => {
@@ -111,8 +105,6 @@ const Editor = () => {
         [setPointerType]
     )
 
-    // The first pointer that touches the app decides which device the editor
-    // binds to, so a resting palm cannot draw while a stylus is in use.
     useEffect(() => {
         notifyInfo(
             <span className="flex items-center gap-[8px] font-funnel text-[12px] font-medium text-ink">
@@ -126,13 +118,14 @@ const Editor = () => {
             </span>,
             {
                 toastId: POINTER_PROMPT,
-                // It closes itself the moment a pointer type is chosen, so a
-                // close button would only offer a way to lose the instruction
-                // without acting on it.
+                // It closes itself once a pointer type is chosen, so a close
+                // button would only discard the instruction unanswered.
                 closeButton: false,
             }
         )
 
+        // The first pointer to touch the app decides which device the editor
+        // binds to, so a resting palm cannot draw while a stylus is in use.
         const onFirstPointerDown = (e: PointerEvent) => {
             choosePointer(e.pointerType as PointerType)
             window.removeEventListener('pointerdown', onFirstPointerDown, true)
@@ -213,11 +206,6 @@ const Editor = () => {
         )
     }
 
-    /**
-     * Suppresses browser gestures across the page, so pull-to-refresh,
-     * overscroll, pinch zoom and double-tap zoom cannot fire mid-stroke on a
-     * tablet. Containers matching GESTURE_EXEMPT keep their normal behaviour.
-     */
     const DisableBrowserGestures = () => {
         useEffect(() => {
             const preventDefaultTouch = (e: TouchEvent) => {
@@ -384,9 +372,6 @@ const Editor = () => {
                                 onClick={downloadFile}
                                 className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-accent/25 md:text-[12px]"
                             >
-                                {/* Was position="right-bottom", which is not
-                                    one of the four supported positions, so the
-                                    bubble rendered with no offset. */}
                                 <ToolTip
                                     text="Download model"
                                     position="right"
@@ -407,7 +392,6 @@ const Editor = () => {
                             </li>
 
                             <li className="m-[4px] flex cursor-pointer items-center justify-between gap-[12px] rounded-[8px] font-funnel text-[8px] font-normal hover:bg-accent/25 md:text-[12px]">
-                                {/* Was position="bottom-right". Same issue. */}
                                 <ToolTip
                                     text="GitHub"
                                     position="bottom"
@@ -549,10 +533,9 @@ const Editor = () => {
                 {sceneOptions && copyGroupModal && <CopyGroups />}
                 {sceneOptions && deleteGroupModal && <DeleteGroups />}
 
-                {/* Reaching for a tool means you are done with the menu. Both
-                    panels overlap the menu's column, so leaving it open hides
-                    the options you just opened. Capture phase, so a child that
-                    stops propagation cannot leave the menu stuck open. */}
+                {/* Reaching for a tool means you are done with the menu, and
+                    both panels overlap its column. Capture phase, so a child
+                    that stops propagation cannot leave the menu stuck open. */}
                 <div onPointerDownCapture={() => setShowOptions(false)}>
                     <ToolPanel isSmall={isSmall} />
                 </div>

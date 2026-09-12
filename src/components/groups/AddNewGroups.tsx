@@ -75,6 +75,9 @@ const AddNewGroups = () => {
     return (
         <div>
             <div className="relative z-10 font-funnel font-normal text-ink">
+                {/* Enter animation only. Closing unmounts immediately;
+                    the old exit transition was a state flag plus a timer that
+                    could fire after a reopen and shut the new dialog. */}
                 <div className="fixed inset-0 animate-overlay-in bg-overlay/50"></div>
 
                 <div className="fixed inset-0 z-10 overflow-y-auto text-[8px] md:text-[12px]">

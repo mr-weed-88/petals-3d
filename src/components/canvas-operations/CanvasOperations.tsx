@@ -50,6 +50,7 @@ export default function CanvasOperations() {
         await saveGroupToIndexDB(canvasRenderStore.getState().groupData)
     }
 
+    // Mount only: rebuilds meshes from the loaded records once.
     useEffect(() => {
         const { newGeneratedGroups, newScene } = generateScene(scene, groupData)
         setGroupData([...newGeneratedGroups])
@@ -58,10 +59,7 @@ export default function CanvasOperations() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    /**
-     * A guide surface has been drawn. It becomes the surface strokes land on,
-     * the pen turns on, and orbiting locks so a drag draws instead of rotating.
-     */
+    /** A finished guide ribbon becomes the surface the pen now draws onto. */
     const handleGuideDrawingFinished = (guideMesh: THREE.Mesh) => {
         setDrawGuide(false)
 
@@ -88,13 +86,13 @@ export default function CanvasOperations() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    /** Disposes meshes the eraser marked, once per scene change. */
     function ClearRemovedObjects() {
         useEffect(() => {
             const meshes: THREE.Mesh[] = []
             const selectedObjects = Array.from(highlighted)
 
             scene.traverse((child) => {
-                // Erased strokes, plus every piece of guide scaffolding.
                 if (
                     (isLineMesh(child) && child.userData.is_deleted) ||
                     isGuideMesh(child)
@@ -123,7 +121,6 @@ export default function CanvasOperations() {
             gl.info.autoReset = false
             gl.info.reset()
 
-            // Restore the base colour of anything that was highlighted.
             selectedObjects.forEach((obj) => {
                 if (!isLineMesh(obj)) return
 

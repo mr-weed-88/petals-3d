@@ -2,10 +2,6 @@ import { useState, useRef, useEffect, type ChangeEvent } from 'react'
 
 import { IconColorPicker } from '@tabler/icons-react'
 
-/* ------------------------------------------------------------------ *
- * Colour conversion
- * ------------------------------------------------------------------ */
-
 interface Rgb {
     r: number
     g: number
@@ -13,11 +9,10 @@ interface Rgb {
 }
 
 interface Hsv {
-    /** Hue in degrees, 0..360. */
     h: number
-    /** Saturation, 0..1. */
+
     s: number
-    /** Value, 0..1. */
+
     v: number
 }
 
@@ -74,30 +69,23 @@ const hexToHsv = (hex: string): Hsv => {
     return { h, s, v }
 }
 
-/** Returns `#RRGGBB` upper-case, or null when the input is not a full hex. */
 const normalizeHex = (v: string | null | undefined): string | null => {
     if (!v) return null
     const s = (v.startsWith('#') ? v : `#${v}`).toUpperCase()
     return /^#([0-9A-F]{6})$/i.test(s) ? s : null
 }
 
-/* ------------------------------------------------------------------ *
- * Component
- * ------------------------------------------------------------------ */
-
 const WHEEL_SIZE = 200
 const SQUARE_SIZE = 100
 const WHEEL_SIZE_M = 160
 const SQUARE_SIZE_M = 72
 
-/** Both React and native mouse events supply these, so neither is excluded. */
 interface PointerPosition {
     clientX: number
     clientY: number
 }
 
 export interface ColorPickerProps {
-    /** Current colour as `#RRGGBB`. */
     value: string
     onChange?: (hex: string) => void
     isSmall: boolean
@@ -114,12 +102,16 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
     const [inputHex, setInputHex] = useState('#000000')
     const [typing, setTyping] = useState(false)
 
-    // Guards the HSV -> hex effect while hex -> HSV is writing, so the two
-    // do not bounce updates off each other.
+    /*
+     * Hue/sat/val and the hex string are two views of one colour, and each
+     * effect below writes the other's state. This flag marks a write as an
+     * echo so the pair cannot loop.
+     */
     const syncingRef = useRef(false)
     const [draggingWheel, setDraggingWheel] = useState(false)
     const [draggingSquare, setDraggingSquare] = useState(false)
 
+    // Incoming `value` wins, unless the user is mid-edit in the hex field.
     useEffect(() => {
         const src = normalizeHex(value)
         if (!src) return
@@ -137,6 +129,8 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
         })
     }, [value, inputHex, typing])
 
+    // Deps are the wheel/square values only: adding inputHex or onChange would
+    // re-fire this on its own output.
     useEffect(() => {
         if (syncingRef.current) return
         const { r, g, b } = hsvToRgb(hue, sat, val)
@@ -199,11 +193,10 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
                 onChange?.(src)
             })
         } catch {
-            // The user dismissed the picker.
+            // The user dismissed the eyedropper. Nothing to report.
         }
     }
 
-    // Hue wheel.
     useEffect(() => {
         const canvas = canvasRef.current
         if (!canvas) return
@@ -247,7 +240,6 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
         ctx.stroke()
     }, [hue, isSmall])
 
-    // Saturation / value square.
     useEffect(() => {
         const canvas = squareCanvasRef.current
         if (!canvas) return

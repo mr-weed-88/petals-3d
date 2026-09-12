@@ -20,10 +20,10 @@ import Divider from '../Divider'
 type ViewAction = 'fov_slider' | 'grids'
 
 export interface ViewsPanelProps {
-    /** True below the 768px breakpoint. Drives icon sizing. */
     isSmall: boolean
 }
 
+/** Camera and viewport controls. Nothing here touches drawn geometry. */
 const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
     const {
         orbitalLock,
@@ -200,9 +200,6 @@ const ViewsPanel = ({ isSmall }: ViewsPanelProps) => {
 
                 <Divider orientation="horizontal" />
 
-                {/* Undo and redo have no handler yet. Building them needs the
-                    mesh-to-store aliasing resolved first: see ARCHITECTURE.md
-                    section 6. */}
                 <ToolTip text="Undo" position="right" delay={100}>
                     <button
                         className={`z-5 cursor-pointer rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25`}

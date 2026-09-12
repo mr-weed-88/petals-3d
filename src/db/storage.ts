@@ -12,24 +12,18 @@ import type {
 
 const linesStore: UseStore = createStore('petals-3d', 'states')
 
-/** The whole document lives under one key. */
 const GROUPS_KEY = 0
 
-/* ------------------------------------------------------------------ *
- * Stored <-> live conversion
+/*
+ * IndexedDB stores values with the structured clone algorithm, which keeps an
+ * object's own fields but drops its prototype. A THREE.Vector3 therefore comes
+ * back as a plain {x,y,z} with no .clone(), .sub() or .applyQuaternion(), and
+ * the stroke geometry silently rebuilds every curve as a straight line.
  *
- * idb-keyval serializes with structured clone, which preserves an
- * object's own properties and discards its prototype. A THREE.Vector3
- * is written as a vector and read back as a bare {x, y, z}.
- *
- * Everything downstream calls Vector3 methods on these points, so they
- * have to be rebuilt exactly once, here, on the way out of the database.
- * Before this existed, `filterPoints` called `.distanceTo` on a plain
- * object and threw, which is why straight-line strokes did not survive a
- * reload: the throw was swallowed by a try/catch and the stroke was left
- * with empty geometry.
- * ------------------------------------------------------------------ */
-
+ * So vectors go in as plain data and are given their class back on the way
+ * out. The Stored* types in types/domain.ts mark which side of that line a
+ * value is on.
+ */
 const toVector3 = (v: StoredVec3): THREE.Vector3 =>
     new THREE.Vector3(v.x, v.y, v.z)
 
@@ -69,21 +63,19 @@ const dehydrateLine = (line: LineRecord): StoredLineRecord => ({
     scale: fromVector3(line.scale),
 })
 
+/** Plain data from the database back into three.js classes. */
 export const rehydrateGroups = (groups: StoredGroup[]): Group[] =>
     groups.map((group) => ({
         ...group,
         objects: group.objects.map(rehydrateLine),
     }))
 
+/** three.js classes down to plain data the database can hold. */
 export const dehydrateGroups = (groups: Group[]): StoredGroup[] =>
     groups.map((group) => ({
         ...group,
         objects: group.objects.map(dehydrateLine),
     }))
-
-/* ------------------------------------------------------------------ *
- * Reads and writes
- * ------------------------------------------------------------------ */
 
 export const saveGroupToIndexDB = async (
     groupData: Group[]

@@ -1,16 +1,7 @@
 /**
- * The single source of truth for both themes.
- *
- * UI chrome is coloured through CSS custom properties, declared in App.css
- * and exposed to Tailwind as semantic names in tailwind.config.js, so a
- * component writes `bg-surface` rather than a hex value.
- *
- * The 3D scene cannot use CSS: three.js needs real colour values, so the
- * scene half of the palette lives here as plain strings and is read from
- * the theme store at render time.
- *
- * Both halves must stay in step with the `:root` and `.dark` blocks in
- * App.css. Change one, change the other.
+ * Both halves of the palette. UI chrome is coloured through the CSS variables
+ * in App.css, which this file must stay in step with; the 3D scene cannot use
+ * CSS, because three.js needs real colour values.
  */
 
 /** What the user picked. `system` follows the OS. */
@@ -19,20 +10,15 @@ export type ThemeMode = 'light' | 'dark' | 'system'
 /** What is actually on screen once `system` has been resolved. */
 export type ResolvedTheme = 'light' | 'dark'
 
-/* ------------------------------------------------------------------ *
- * Scene palette
- * ------------------------------------------------------------------ */
-
 export interface ScenePalette {
-    /** Canvas clear colour. Also the default for the background picker. */
+    /** Canvas clear colour, and the default for the background picker. */
     canvas: string
-    /** Minor grid lines. The major axis lines keep their fixed axis colours. */
+    /** Minor grid lines. Major axes keep their fixed AXIS colours. */
     grid: string
     /** Guide surfaces and the in-progress guide stroke. */
     guide: string
     /** Wireframe of the adjustable loft surface. */
     loftWire: string
-    /** Ambient fill colour and strength. */
     ambient: string
     ambientIntensity: number
 }
@@ -48,8 +34,7 @@ export const SCENE: Record<ResolvedTheme, ScenePalette> = {
     },
     dark: {
         // A shade lighter than the panels, so the chrome reads as floating
-        // above the work area rather than cut out of it. Light enough that
-        // dark grey strokes stay visible.
+        // above the work area. Light enough that grey strokes stay visible.
         canvas: '#232326',
         // Lifted well off the background: a grid at light-theme lightness
         // disappears entirely against a dark ground.
@@ -57,68 +42,67 @@ export const SCENE: Record<ResolvedTheme, ScenePalette> = {
         guide: '#7A7A84',
         loftWire: '#5E5E68',
         ambient: '#FFFFFF',
-        // Lower, because strokes are drawn against a dark ground and the
-        // light-theme value washes them out.
+        // Lower, because the light-theme value washes strokes out on dark.
         ambientIntensity: 6,
     },
 }
 
-/**
- * Axis colours, shared by the world grids and the transform gizmo. Fixed
- * across themes: these are signal, not decoration, and X/Y/Z must stay
- * recognisable.
- */
+/** Fixed across themes: X/Y/Z are signal, not decoration. */
 export const AXIS = {
     x: '#DE3163',
     y: '#50C878',
     z: '#0096FF',
 } as const
 
-/* ------------------------------------------------------------------ *
- * UI palette
- * ------------------------------------------------------------------ */
-
 /**
- * The brand mint. Bright enough to read on both grounds, so it is the one
- * colour that does not change between themes; everything else is built
- * around its hue.
+ * The brand greens, darkest to lightest. The accent draws from opposite ends
+ * per theme: an active control must be dark enough to read on white and light
+ * enough to read on near-black, so unlike every other token it cannot hold one
+ * value.
  */
-const ACCENT = '#00FFA5'
+const GREEN = {
+    deepest: '#0A3C30',
+    deep: '#00674F',
+    mid: '#3EBB9E',
+    light: '#73E6CB',
+} as const
 
 export const UI: Record<ResolvedTheme, Record<string, string>> = {
     light: {
         surface: '#FFFFFF',
-        'surface-2': '#F0FBF6',
-        'surface-3': '#DFF6EB',
-        ink: '#08221A',
-        'ink-muted': '#3D6154',
-        line: '#2F5548',
-        accent: ACCENT,
-        // Sits on top of `accent`. Near-black in both themes: the mint is
-        // bright enough that dark text is the only readable choice on it.
-        'accent-ink': '#00160E',
-        overlay: '#0B2A20',
+        'surface-2': '#F2FBF8',
+        'surface-3': '#E3F6EF',
+        ink: GREEN.deepest,
+        'ink-muted': '#247B67',
+        line: GREEN.deep,
+        accent: GREEN.deep,
+        // Sits on top of `accent`, so it inverts with it.
+        'accent-ink': '#FFFFFF',
+        // The modal backdrop, and the only token deliberately outside the
+        // greens: a tinted scrim washed the whole canvas in accent.
+        overlay: '#9CA3AF',
     },
-    /**
-     * Neutral near-black, on the same faintly cool grey as the canvas. The
-     * mint accent is the only colour in the dark theme; tinting the panels
-     * green too made them compete with it. Nothing is pure #000000, so the
-     * panels keep an edge against the tooltip and against a black desktop.
+
+    /*
+     * Surfaces stay neutral near-black. Tinting the panels green as well made
+     * them compete with the accent, which is the one thing that should read as
+     * colour. Nothing is pure black, so panels keep an edge against the
+     * tooltip and against a black desktop.
      */
     dark: {
         surface: '#141417',
         'surface-2': '#1C1C20',
         'surface-3': '#26262B',
         ink: '#E6E6EA',
-        'ink-muted': '#8C8C96',
-        line: '#3A3A42',
-        accent: ACCENT,
-        'accent-ink': '#00160E',
-        overlay: '#0A0A0C',
+        'ink-muted': '#8A9A95',
+        line: GREEN.mid,
+        accent: GREEN.light,
+        'accent-ink': GREEN.deepest,
+
+        overlay: '#18181B',
     },
 }
 
-/** Reads the OS preference. Falls back to light where unavailable. */
 export function systemTheme(): ResolvedTheme {
     if (typeof window === 'undefined' || !window.matchMedia) return 'light'
     return window.matchMedia('(prefers-color-scheme: dark)').matches

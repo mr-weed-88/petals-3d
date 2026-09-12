@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 
+/** Camera and viewport state. Nothing here touches drawn geometry. */
 export interface CanvasViewState {
-    /** Freezes orbit rotation and pan so a drag draws instead of orbiting. */
+    /** Freezes orbit and pan while a drawing tool is active. */
     orbitalLock: boolean
     setOrbitalLock: (orbitalLockState: boolean) => void
 
@@ -20,7 +21,6 @@ export interface CanvasViewState {
     fullScreen: boolean
     setFullScreen: (bool: boolean) => void
 
-    /** The three world grid planes, toggled independently. */
     gridPlaneX: boolean
     setGridPlaneX: (show: boolean) => void
 

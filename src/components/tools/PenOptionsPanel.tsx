@@ -34,10 +34,10 @@ import {
 } from '../../helpers/toolHelper'
 
 export interface PenOptionsPanelProps {
-    /** True below the 768px breakpoint. Drives icon sizing. */
     isSmall: boolean
 }
 
+/** Brush settings. Only one flyout is open at a time. */
 const PenOptionsPanel = ({ isSmall }: PenOptionsPanelProps) => {
     const {
         mirror,

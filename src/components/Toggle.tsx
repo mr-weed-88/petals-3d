@@ -1,23 +1,15 @@
 export interface ToggleProps {
     checked: boolean
     onChange: (checked: boolean) => void
-    /** True below the 768px breakpoint, matching the icon sizing elsewhere. */
+    /** True below the 768px breakpoint, matching icon sizing elsewhere. */
     isSmall?: boolean
     /** Announced to assistive technology, since the switch carries no text. */
     label?: string
 }
 
 /**
- * A sliding on/off switch.
- *
- * It replaces a pair of droplet icons sitting side by side in a pill, one of
- * them painted transparent, which faked the knob moving. That could only ever
- * approximate a switch: the knob was a glyph rather than a shape, so its size
- * and position came from the icon font rather than the layout, and the track
- * had to be wide enough for two icons whether or not that suited the row.
- *
- * Both states carry their own track and knob colours, so neither depends on
- * the surface behind it and both survive a theme change.
+ * Sliding on/off switch. Both states carry their own track and knob colours,
+ * so neither depends on the surface behind it and both survive a theme swap.
  */
 const Toggle = ({ checked, onChange, isSmall = false, label }: ToggleProps) => {
     const track = isSmall ? 'h-[16px] w-[28px]' : 'h-[20px] w-[36px]'

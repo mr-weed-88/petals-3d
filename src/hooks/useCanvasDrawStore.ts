@@ -11,6 +11,7 @@ import type {
     AxisMode,
 } from '../types/domain'
 
+/** Tool state and brush settings. The 3D layer reads almost everything here. */
 export interface CanvasDrawState {
     /** Input device the editor is bound to. Every pointer handler gates on it. */
     pointerType: PointerType
@@ -20,7 +21,7 @@ export interface CanvasDrawState {
     plane: THREE.Mesh | null
     setPlane: (p: THREE.Mesh | null) => void
 
-    /** Same mesh as `plane`; kept separately so guide swaps can clear one. */
+    /** Same mesh as `plane`; kept apart so a guide swap can clear one. */
     dynamicDrawingPlaneMesh: THREE.Mesh | null
     setDynamicDrawingPlaneMesh: (mesh: THREE.Mesh | null) => void
 
@@ -57,8 +58,6 @@ export interface CanvasDrawState {
     mergeGeometries: boolean
     setMergeGeometries: (bool: boolean) => void
 
-    /* Brush ------------------------------------------------------- */
-
     activeMaterialType: MaterialType
     setActiveMaterialType: (type: MaterialType) => void
 
@@ -84,11 +83,9 @@ export interface CanvasDrawState {
     pressureMode: boolean
     setPressureMode: (bool: boolean) => void
 
-    /** Colour applied to an existing selection, distinct from `strokeColor`. */
+    /** Colour applied to an existing selection, distinct from strokeColor. */
     lineColor: string
     setLineColor: (color: string) => void
-
-    /* Mirroring --------------------------------------------------- */
 
     mirror: MirrorState
     setMirror: (value: Partial<MirrorState>) => void
@@ -96,13 +93,10 @@ export interface CanvasDrawState {
     mirrorOptions: boolean
     setMirrorOptions: (bool: boolean) => void
 
-    /* Selection --------------------------------------------------- */
-
+    /** Meshes the selection tool currently has picked. */
     highlighted: THREE.Mesh[]
     setHighlighted: (data: THREE.Mesh[]) => void
     addToHighlighted: (mesh: THREE.Mesh) => void
-
-    /* Transform --------------------------------------------------- */
 
     transformMode: TransformMode
     setTransformMode: (mode: TransformMode) => void
@@ -110,16 +104,12 @@ export interface CanvasDrawState {
     axisMode: AxisMode
     setAxisMode: (mode: AxisMode) => void
 
-    /* Bend guide -------------------------------------------------- */
-
     /** Profile curve the bend tool sweeps along a rail. */
     ogGuidePoints: THREE.Vector3[] | null
     setOgGuidePoints: (data: THREE.Vector3[] | null) => void
 
     ogGuideNormals: THREE.Vector3[] | null
     setOgGuideNormals: (data: THREE.Vector3[] | null) => void
-
-    /* Panel visibility -------------------------------------------- */
 
     openOpacitySlider: boolean
     setOpenOpacitySlider: (bool: boolean) => void
@@ -141,8 +131,6 @@ export interface CanvasDrawState {
 
     drawGuideShapeOptions: boolean
     setDrawGuideShapeOptions: (bool: boolean) => void
-
-    /* Slider values ----------------------------------------------- */
 
     tensionPercentage: number
     setTensionPercentage: (value: number) => void

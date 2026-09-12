@@ -6,11 +6,7 @@ import type {
     StrokeType,
 } from '../types/domain'
 
-/**
- * `'tube'` used to be accepted here, but `getAdaptiveStrokeWidth` has no
- * case for it and would have returned undefined dimensions. Nothing in the
- * UI could reach it, and the StrokeType union now rules it out.
- */
+/** Switches brush profile and closes the flyout. */
 export function handleStroke(
     stroke: StrokeType,
     setStrokeType: (value: StrokeType) => void
@@ -28,6 +24,7 @@ export function handleStroke(
     }
 }
 
+/** Switches the shape the pen draws and closes the flyout. */
 export function handleShape(
     shape: DrawShapeType,
     setDrawShapeType: (value: DrawShapeType) => void
@@ -44,6 +41,7 @@ export function handleShape(
     }
 }
 
+/** Toggles one mirror axis, leaving the others alone. */
 export function handleMirroring(
     axis: MirrorAxis | 'NONE',
     mirror: MirrorState,
@@ -66,10 +64,3 @@ export function handleMirroring(
             break
     }
 }
-
-/*
- * `handleGroupOperation` used to live here. It called `dashboardStore(
- * (state) => state)` at module scope, which is a React hook invoked
- * outside a component and would have thrown on first use. Nothing
- * imported it. SceneOptionsPanel has its own working version.
- */

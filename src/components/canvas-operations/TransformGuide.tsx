@@ -6,10 +6,6 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { isGuideMesh } from '../../types/domain'
 
-/**
- * The gizmo sub-objects are not part of the public TransformControls API.
- * Declared narrowly so the traversal below is typed rather than `any`.
- */
 interface TransformControlsInternals {
     _gizmo: {
         gizmo: {
@@ -18,7 +14,6 @@ interface TransformControlsInternals {
     }
 }
 
-/** Applies to every material, since three.js allows an array. */
 function forEachMaterial(
     object: THREE.Object3D,
     fn: (material: THREE.Material) => void
@@ -32,6 +27,7 @@ function forEachMaterial(
     }
 }
 
+/** Gizmo for moving, rotating and scaling a selected guide surface. */
 const TransformGuide = () => {
     const { camera, pointer, raycaster, scene, gl, invalidate } = useThree()
     const { axisMode, pointerType, transformMode } = canvasDrawStore(
@@ -52,7 +48,6 @@ const TransformGuide = () => {
     const tempQuaternion = useRef(new THREE.Quaternion())
     const tempScale = useRef(new THREE.Vector3())
 
-    /** Hides the planar and uniform handles, leaving only the three axes. */
     const hideGizmoPlanes = (helper: THREE.Object3D) => {
         const gizmoIndex =
             transformMode === 'translate'
@@ -82,7 +77,6 @@ const TransformGuide = () => {
         })
     }
 
-    /** Reparents an object while preserving its world transform. */
     const toLocalSpace = (
         object: THREE.Object3D,
         newParent: THREE.Object3D
@@ -137,8 +131,6 @@ const TransformGuide = () => {
         controls.setMode(transformMode)
         transformRef.current = controls
 
-        // setColors takes four positional colours. The original passed a
-        // single object, so none of them were ever applied.
         controls.setColors('#ff0000', '#00ff00', '#0000ff', '#FF5F1F')
 
         controls.showX = true
@@ -149,10 +141,6 @@ const TransformGuide = () => {
         const helper = internals._gizmo.gizmo.translate.children
 
         helper.forEach((child) => {
-            // `paramters` is a misspelling of `parameters`, so the second
-            // clause has never matched anything. Kept as it was: correcting
-            // the spelling would start hiding gizmo parts that are visible
-            // today.
             const geometryParams = (
                 child as THREE.Mesh & {
                     geometry?: {
@@ -209,8 +197,6 @@ const TransformGuide = () => {
             controls.detach()
             controls.dispose()
 
-            // Hand every selected object back to the scene with its world
-            // transform baked in, so detaching does not move anything.
             const childrenToRestore = [...dummy.children]
             childrenToRestore.forEach((child) => {
                 child.updateMatrixWorld()

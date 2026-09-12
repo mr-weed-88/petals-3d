@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
-/** Where the bubble sits relative to the element it wraps. */
 export type TooltipPosition = 'top' | 'bottom' | 'left' | 'right'
 
 /** Gap in pixels between the trigger and the bubble. */
@@ -54,15 +53,10 @@ function placeBubble(rect: DOMRect, position: TooltipPosition): BubbleStyle {
 }
 
 /**
- * Deliberately not themed: the bubble is always solid black with white text
- * in both themes, so it reads the same everywhere and never blends into the
- * panel behind it.
- *
- * It renders through a portal on <body> with fixed positioning. The panels
- * are absolutely positioned and create their own stacking contexts, so a
- * tooltip left inside one could be covered by the next panel no matter how
- * high its z-index. Escaping to the body is the only way it is reliably on
- * top of everything.
+ * Not themed on purpose: always black on white, so it never blends into the
+ * panel behind it. It portals to <body> because the panels create their own
+ * stacking contexts, and a bubble left inside one can be covered by the next
+ * panel however high its z-index.
  */
 const ToolTip = ({
     children,
@@ -105,8 +99,15 @@ const ToolTip = ({
             {style &&
                 text &&
                 createPortal(
+                    /*
+                     * Two elements, because each needs its own transform and
+                     * an element only gets one. The outer carries the
+                     * translate that anchors the bubble; the inner runs the
+                     * scale animation. Shared, the animation overrode the
+                     * inline translate and the bubble only jumped into place
+                     * once the animation finished.
+                     */
                     <div
-                        role="tooltip"
                         style={{
                             position: 'fixed',
                             left: style.left,
@@ -114,9 +115,14 @@ const ToolTip = ({
                             transform: style.transform,
                             zIndex: 2147483647,
                         }}
-                        className="pointer-events-none animate-tooltip-fade-in rounded-[6px] bg-[#000000] px-[8px] py-[4px] text-[12px] font-medium whitespace-nowrap text-[#FFFFFF] shadow-lg"
+                        className="pointer-events-none"
                     >
-                        {text}
+                        <div
+                            role="tooltip"
+                            className="animate-tooltip-fade-in rounded-[6px] bg-[#000000] px-[8px] py-[4px] text-[12px] font-medium whitespace-nowrap text-[#FFFFFF] shadow-lg"
+                        >
+                            {text}
+                        </div>
                     </div>,
                     document.body
                 )}

@@ -16,7 +16,7 @@ export const guideObjectType: readonly GuideObjectType[] = [
     'DYNAMIC_GUIDE_LINE',
 ]
 
-/** Toast transition. The class names are defined in tailwind.config.js. */
+/** Toast transition. These class names are defined in tailwind.config.js. */
 export const Fade = cssTransition({
     enter: 'animate-fade-in',
     exit: 'animate-fade-out',

@@ -8,10 +8,6 @@ import {
 } from '@react-three/drei'
 import { EffectComposer, Bloom } from '@react-three/postprocessing'
 
-// R3F v9 already exposes the whole three.js catalogue, but this call is kept
-// so intrinsic elements stay registered if that default ever changes. The
-// namespace includes non-constructors such as UniformsUtils, which the
-// Catalogue type does not model.
 extend(THREE as unknown as Parameters<typeof extend>[0])
 
 import { canvasViewStore } from '../../hooks/useCanvasViewStore'
@@ -23,6 +19,7 @@ import CanvasOperations from './CanvasOperations'
 
 type OrbitControlsRef = ComponentRef<typeof OrbitControls>
 
+/** The R3F canvas: camera, lights, grids, post-processing and the tool layer. */
 const Canvas3d = () => {
     const {
         orbitalLock,
@@ -48,10 +45,6 @@ const Canvas3d = () => {
 
     const orbitControlsRef = useRef<OrbitControlsRef>(null)
 
-    /**
-     * Swings the camera to the nearest axis while keeping its distance,
-     * so a double-click gives a clean orthogonal view.
-     */
     function SnapCameraPositionAndRotation() {
         const { camera } = useThree()
         const target = new THREE.Vector3(0, 0, 0)
@@ -92,7 +85,6 @@ const Canvas3d = () => {
         return null
     }
 
-    /** Eases the camera toward the target field of view each frame. */
     function SmoothFOV() {
         const { camera } = useThree()
         const fovRef = useRef(
@@ -109,10 +101,6 @@ const Canvas3d = () => {
         return null
     }
 
-    /**
-     * Bloom pass. Mounted only after the first frame, and on its own camera
-     * layer with autoClear off so the glow composites over the scene.
-     */
     function SceneComposer() {
         const { camera, gl } = useThree()
         const [ready, setReady] = useState(false)
@@ -135,7 +123,6 @@ const Canvas3d = () => {
         )
     }
 
-    /** Reveals the scene one object at a time on load. */
     function SequentialLoader({ onComplete }: { onComplete: () => void }) {
         const { scene } = useThree()
 
@@ -201,9 +188,6 @@ const Canvas3d = () => {
 
             {(gridPlaneX || gridPlaneY || gridPlaneZ) && (
                 <group>
-                    {/* Axis colours are fixed; only the minor grid lines
-                        follow the theme, so they stay visible on a dark
-                        ground without glaring on a light one. */}
                     {gridPlaneX && (
                         <gridHelper
                             scale={1}
