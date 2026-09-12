@@ -46,8 +46,7 @@ const emptyMirrorMeshes = (): Record<MirrorAxis, StripMeshes> => ({
 })
 
 /**
- * The stroke engine.
- *
+ * The stroke engine (main drawing helper integration)
  * Samples the pointer onto the active guide surface, builds solid tube
  * geometry from those samples, and merges the four faces into one mesh when
  * the stroke ends.
