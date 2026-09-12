@@ -5,7 +5,6 @@ import {
     IconBulb,
     IconCheck,
     IconCursorText,
-    IconDropletHalf2,
     IconEye,
     IconEyeOff,
     IconPlus,
@@ -14,6 +13,7 @@ import {
 } from '@tabler/icons-react'
 
 import ColorPicker from '../ColorPicker'
+import Toggle from '../Toggle'
 import RangeSlider from '../RangeSlider'
 
 import { saveGroupToIndexDB } from '../../db/storage'
@@ -295,85 +295,28 @@ const SceneOptionsPanel = ({ isSmall }: SceneOptionsPanelProps) => {
                                 </div>
                             </div>
 
-                            <div className="m-[12px] flex items-center justify-between">
+                            <div className="m-[12px] flex items-center justify-between gap-[12px]">
                                 <div className="text-[8px] md:text-[12px]">
                                     Post Process
                                 </div>
-                                <div
-                                    onClick={() => setPostProcess(!postProcess)}
-                                    className="m-[12px] flex cursor-pointer items-center rounded-[12px]"
-                                >
-                                    {/* Two droplets fake a sliding switch: the
-                                        one on the active side is drawn, the
-                                        other is transparent. It used to hide
-                                        by matching the pill colour, which
-                                        cannot survive a theme change. */}
-                                    <div
-                                        className={`flex transform animate-fade-in items-center rounded-[12px] transition-all duration-200 ease-out ${
-                                            postProcess
-                                                ? 'bg-success text-accent-ink'
-                                                : 'bg-surface-3 text-ink'
-                                        }`}
-                                    >
-                                        <IconDropletHalf2
-                                            color={
-                                                postProcess
-                                                    ? 'transparent'
-                                                    : 'currentColor'
-                                            }
-                                            size={isSmall ? 12 : 20}
-                                            stroke={1}
-                                        />
-                                        <IconDropletHalf2
-                                            color={
-                                                postProcess
-                                                    ? 'currentColor'
-                                                    : 'transparent'
-                                            }
-                                            size={isSmall ? 12 : 20}
-                                            stroke={1}
-                                        />
-                                    </div>
-                                </div>
+                                <Toggle
+                                    checked={postProcess}
+                                    onChange={setPostProcess}
+                                    isSmall={isSmall}
+                                    label="Post Process"
+                                />
                             </div>
 
-                            <div className="m-[12px] flex items-center justify-between">
+                            <div className="m-[12px] flex items-center justify-between gap-[12px]">
                                 <div className="text-[8px] md:text-[12px]">
                                     Sequential Loading
                                 </div>
-                                <div
-                                    onClick={() =>
-                                        setSequentialLoading(!sequentialLoading)
-                                    }
-                                    className="m-[12px] flex cursor-pointer items-center rounded-[12px]"
-                                >
-                                    <div
-                                        className={`flex transform animate-fade-in items-center rounded-[12px] transition-all duration-200 ease-out ${
-                                            sequentialLoading
-                                                ? 'bg-success text-accent-ink'
-                                                : 'bg-surface-3 text-ink'
-                                        }`}
-                                    >
-                                        <IconDropletHalf2
-                                            color={
-                                                sequentialLoading
-                                                    ? 'transparent'
-                                                    : 'currentColor'
-                                            }
-                                            size={isSmall ? 12 : 20}
-                                            stroke={1}
-                                        />
-                                        <IconDropletHalf2
-                                            color={
-                                                sequentialLoading
-                                                    ? 'currentColor'
-                                                    : 'transparent'
-                                            }
-                                            size={isSmall ? 12 : 20}
-                                            stroke={1}
-                                        />
-                                    </div>
-                                </div>
+                                <Toggle
+                                    checked={sequentialLoading}
+                                    onChange={setSequentialLoading}
+                                    isSmall={isSmall}
+                                    label="Sequential Loading"
+                                />
                             </div>
 
                             <div className="gesture-allowed border-t-[1px] border-line/25">
