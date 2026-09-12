@@ -8,6 +8,8 @@ import { saveGroupToIndexDB } from '../../db/storage'
 import { notifySuccess } from '../../helpers/notify'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
+import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
+import { transformTargetStore } from '../../hooks/useTransformTargetStore'
 import { isLineMesh, type LineMesh, type LineRecord } from '../../types/domain'
 
 interface TransformControlsInternals {
@@ -66,6 +68,9 @@ const TransformLine = () => {
     const { activeGroup, setActiveScene, setGroupData } = canvasRenderStore(
         (state) => state
     )
+
+    const { transformStyle } = editorPrefsStore((state) => state)
+    const setTarget = transformTargetStore((state) => state.setTarget)
 
     const transformRef = useRef<TransformControls | null>(null)
     const dummyTarget = useRef(new THREE.Group())
@@ -276,20 +281,44 @@ const TransformLine = () => {
         })
     }, [transformMode])
 
+    /*
+     * The legacy gizmo only attaches in legacy mode. Selection, grouping and
+     * commit are untouched either way, which is what lets the joystick be
+     * swapped in without this file knowing anything about it.
+     */
     useEffect(() => {
         const controls = transformRef.current
         if (!controls) return
 
-        if (attachedGizmos) {
+        const helper = controls.getHelper()
+
+        if (attachedGizmos && transformStyle === 'legacy') {
             controls.attach(dummyTarget.current)
-            const helper = controls.getHelper()
             if (!scene.children.includes(helper)) scene.add(helper)
         } else {
             controls.detach()
-            const helper = controls.getHelper()
             if (scene.children.includes(helper)) scene.remove(helper)
         }
-    }, [attachedGizmos, scene])
+    }, [attachedGizmos, scene, transformStyle])
+
+    /*
+     * Publishes the proxy Group for the joystick, which lives outside the
+     * canvas and cannot reach into the scene graph itself.
+     */
+    useEffect(() => {
+        if (!attachedGizmos || transformStyle !== 'joystick') {
+            setTarget(null)
+            return
+        }
+
+        setTarget({
+            object: dummyTarget.current,
+            commit: () => void updateLineWorldPoints(),
+        })
+
+        return () => setTarget(null)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [attachedGizmos, transformStyle, setTarget])
 
     useEffect(() => {
         if (transformRef.current) transformRef.current.setMode(transformMode)

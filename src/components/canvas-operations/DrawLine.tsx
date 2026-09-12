@@ -51,7 +51,7 @@ const emptyMirrorMeshes = (): Record<MirrorAxis, StripMeshes> => ({
  * the stroke ends.
  */
 const DrawLine = () => {
-    const { camera, scene } = useThree()
+    const { camera, scene, gl } = useThree()
     const planeRef = useRef<THREE.Mesh>(null)
 
     const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -134,10 +134,7 @@ const DrawLine = () => {
             const plane = planeRef.current
             if (!plane) return null
 
-            const canvas = document.querySelector('canvas')
-            if (!canvas) return null
-
-            const rect = canvas.getBoundingClientRect()
+            const rect = gl.domElement.getBoundingClientRect()
 
             const mouse = new THREE.Vector2(
                 ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -159,7 +156,7 @@ const DrawLine = () => {
                     .normalize(),
             }
         },
-        [camera]
+        [camera, gl]
     )
 
     /**

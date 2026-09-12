@@ -4,12 +4,14 @@ import {
     IconBallpen,
     IconBrandGithub,
     IconDeviceDesktop,
+    IconDeviceGamepad,
     IconDownload,
     IconHandFinger,
     IconMenu2,
     IconMoon,
     IconMouse,
     IconSun,
+    IconVector,
 } from '@tabler/icons-react'
 import { v4 as uuidv4 } from 'uuid'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
@@ -20,6 +22,7 @@ import ViewsPanel from '../tools/ViewsPanel'
 
 import { dashboardStore } from '../../hooks/useDashboardStore'
 import { themeStore } from '../../hooks/useThemeStore'
+import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
 import { SCENE } from '../../config/theme'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
@@ -30,6 +33,7 @@ import RenameGroups from '../groups/RenameGroups'
 import DeleteGroups from '../groups/DeleteGroups'
 
 import ToolTip from '../ToolTip'
+import Joystick from '../joystick/Joystick'
 import {
     dismissNotice,
     notifyError,
@@ -47,6 +51,12 @@ const GESTURE_EXEMPT = '.overflow-y-auto, .custom-scrollbar, .gesture-allowed'
 
 /** Keys that scroll the page, suppressed so they cannot fire mid-stroke. */
 const SCROLL_KEYS = [32, 33, 34, 35, 36, 37, 38, 39, 40]
+
+/** Legacy shows the three.js gizmo on the selection; joystick shows the widget. */
+const TRANSFORM_OPTIONS = [
+    { style: 'joystick' as const, label: 'Joystick', Icon: IconDeviceGamepad },
+    { style: 'legacy' as const, label: 'Legacy transform', Icon: IconVector },
+]
 
 const THEME_OPTIONS = [
     { mode: 'light' as const, label: 'Light', Icon: IconSun },
@@ -81,6 +91,9 @@ const Editor = () => {
         canvasRenderStore((state) => state)
 
     const { mode, resolved, setMode } = themeStore((state) => state)
+    const { transformStyle, setTransformStyle } = editorPrefsStore(
+        (state) => state
+    )
     const { setCanvasBackgroundColor } = canvasRenderStore((state) => state)
 
     /*
@@ -495,6 +508,42 @@ const Editor = () => {
                             <li className="flex border-b-[1px] border-line/25"></li>
 
                             <li className="m-[4px] flex items-center justify-between gap-[12px] p-[4px]">
+                                <div>Transform</div>
+                                <div className="flex items-center justify-between gap-[4px]">
+                                    {TRANSFORM_OPTIONS.map((option) => (
+                                        <ToolTip
+                                            key={option.style}
+                                            text={option.label}
+                                            position="bottom"
+                                            delay={100}
+                                        >
+                                            <button
+                                                onClick={() =>
+                                                    setTransformStyle(
+                                                        option.style
+                                                    )
+                                                }
+                                                className={`flex cursor-pointer justify-center rounded-[8px] p-[8px] font-bold ${
+                                                    transformStyle ===
+                                                    option.style
+                                                        ? 'bg-accent text-accent-ink'
+                                                        : 'hover:bg-accent/25'
+                                                }`}
+                                            >
+                                                <option.Icon
+                                                    color="currentColor"
+                                                    size={isSmall ? 12 : 20}
+                                                    stroke={1}
+                                                />
+                                            </button>
+                                        </ToolTip>
+                                    ))}
+                                </div>
+                            </li>
+
+                            <li className="flex border-b-[1px] border-line/25"></li>
+
+                            <li className="m-[4px] flex items-center justify-between gap-[12px] p-[4px]">
                                 <div>Theme</div>
                                 <div className="flex items-center justify-between gap-[4px]">
                                     {THEME_OPTIONS.map((option) => (
@@ -545,6 +594,8 @@ const Editor = () => {
                 <div onPointerDownCapture={() => setShowOptions(false)}>
                     <ViewsPanel isSmall={isSmall} />
                 </div>
+
+                <Joystick />
             </div>
         </>
     )

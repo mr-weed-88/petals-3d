@@ -46,6 +46,20 @@
        greens. A tinted scrim read as a wash of accent over the whole canvas,
        which drew more attention than the dialog it was meant to sit behind. */
     --c-overlay: #9ca3af;
+    /* Pure black and white, unlike the ink tokens, for the joystick parts that
+       must read as neutral next to the axis colours: the orientation cube and
+       the rail a cone slides along. */
+    --c-contrast: #000000;
+    /*
+     * The drawing cursor. A system crosshair cannot be recoloured, and on a
+     * pale canvas it all but vanishes, so it is drawn here instead and swapped
+     * with the theme. The numbers after the url are the hotspot, which has to
+     * sit on the centre of the cross rather than its corner.
+     */
+    --cursor-draw:
+        url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cpath%20d='M12%203v6M12%2015v6M3%2012h6M15%2012h6'%20stroke='%23000000'%20stroke-width='2'%20stroke-linecap='round'%20fill='none'/%3E%3C/svg%3E")
+            12 12,
+        crosshair;
 
     color-scheme: light;
 }
@@ -71,6 +85,11 @@
     /* Neutral here too, but dark: a light scrim over a near-black editor
        would lift the whole page rather than push it back. */
     --c-overlay: #18181b;
+    --c-contrast: #ffffff;
+    --cursor-draw:
+        url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cpath%20d='M12%203v6M12%2015v6M3%2012h6M15%2012h6'%20stroke='%23ffffff'%20stroke-width='2'%20stroke-linecap='round'%20fill='none'/%3E%3C/svg%3E")
+            12 12,
+        crosshair;
 
     color-scheme: dark;
 }

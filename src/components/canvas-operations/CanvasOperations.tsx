@@ -9,6 +9,7 @@ import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
 import DrawLine from './DrawLine'
 import EraseLine from './EraseLine'
 import TransformLine from './TransformLine'
+import JoystickCameraBridge from '../joystick/JoystickCameraBridge'
 import LoftGuidePlane from './LoftGuidePlane'
 import TransformGuide from './TransformGuide'
 import DynamicGuidePlane from './DynamicGuidePlane'
@@ -182,6 +183,7 @@ export default function CanvasOperations() {
 
             <DrawLine />
             {selectLines && <TransformLine />}
+            {selectLines && <JoystickCameraBridge />}
             <EraseLine />
         </>
     )

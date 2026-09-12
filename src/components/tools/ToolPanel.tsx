@@ -27,6 +27,7 @@ import BendGuidePlaneIcon from '../svg-icons/BendGuidePlaneIcon'
 import { canvasDrawStore } from '../../hooks/useCanvasDrawStore'
 import { canvasViewStore } from '../../hooks/useCanvasViewStore'
 import { canvasRenderStore } from '../../hooks/useRenderSceneStore'
+import { editorPrefsStore } from '../../hooks/useEditorPrefsStore'
 
 import ToolTip from '../ToolTip'
 import ToolButton from '../ToolButton'
@@ -131,6 +132,8 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
 
     const { setOrbitalLock } = canvasViewStore((state) => state)
 
+    const { transformStyle } = editorPrefsStore((state) => state)
+
     const { sceneOptions, setSceneOptions, setGroupOptions, setRenderOptions } =
         canvasRenderStore((state) => state)
 
@@ -141,7 +144,15 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
     function handleDraw(button: DrawButton) {
         switch (button) {
             case 'pen':
-                setPenActive(!penActive)
+                /*
+                 * Selects rather than toggles. Finishing a guide already
+                 * switches the pen on, so pressing the button then turned
+                 * drawing off and handed the drag back to the orbit controls,
+                 * which looked exactly like the pen being broken. Leave the
+                 * pen by choosing another tool, or free the camera with the
+                 * orbit lock in the views panel.
+                 */
+                setPenActive(true)
                 setOpenDrawShapeOptions(false)
                 setEraserActive(false)
                 setSelectLines(false)
@@ -662,79 +673,111 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
             {(selectLines || selectGuide) && (
                 <div className="absolute top-[72px] left-[12px] z-5 flex flex-col justify-items-center gap-[4px] rounded-[12px] border-[1px] border-line/25 bg-surface p-[4px] drop-shadow-xl">
                     {selectLines && (
-                        <button
-                            onClick={handleColorChange}
-                            className="flex cursor-pointer items-center justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25"
+                        <ToolTip
+                            text="Color Select"
+                            position="right"
+                            delay={100}
                         >
-                            <IconPalette
-                                color={lineColor}
-                                size={isSmall ? 12 : 20}
-                                stroke={1}
-                            />
-                        </button>
+                            <button
+                                onClick={handleColorChange}
+                                className="flex cursor-pointer items-center justify-center rounded-[8px] border-[0px] p-[8px] font-bold hover:bg-accent/25"
+                            >
+                                <IconPalette
+                                    color={lineColor}
+                                    size={isSmall ? 12 : 20}
+                                    stroke={1}
+                                />
+                            </button>
+                        </ToolTip>
                     )}
 
-                    <div onClick={() => setTransformMode('translate')}>
-                        <ToolButton
-                            condition={transformMode === 'translate'}
-                            icon={
-                                <IconArrowsMove
-                                    color="currentColor"
-                                    size={isSmall ? 12 : 20}
-                                    stroke={1}
-                                />
-                            }
-                        />
-                    </div>
+                    {/* The joystick carries move, rotate and scale itself, so
+                        these would be a second set of controls for one job. */}
+                    {transformStyle === 'legacy' && (
+                        <>
+                            <ToolTip text="Move" position="right" delay={100}>
+                                <div
+                                    onClick={() =>
+                                        setTransformMode('translate')
+                                    }
+                                >
+                                    <ToolButton
+                                        condition={
+                                            transformMode === 'translate'
+                                        }
+                                        icon={
+                                            <IconArrowsMove
+                                                color="currentColor"
+                                                size={isSmall ? 12 : 20}
+                                                stroke={1}
+                                            />
+                                        }
+                                    />
+                                </div>
+                            </ToolTip>
 
-                    <div onClick={() => setTransformMode('rotate')}>
-                        <ToolButton
-                            condition={transformMode === 'rotate'}
-                            icon={
-                                <IconRotate
-                                    color="currentColor"
-                                    size={isSmall ? 12 : 20}
-                                    stroke={1}
-                                />
-                            }
-                        />
-                    </div>
+                            <ToolTip text="Rotate" position="right" delay={100}>
+                                <div onClick={() => setTransformMode('rotate')}>
+                                    <ToolButton
+                                        condition={transformMode === 'rotate'}
+                                        icon={
+                                            <IconRotate
+                                                color="currentColor"
+                                                size={isSmall ? 12 : 20}
+                                                stroke={1}
+                                            />
+                                        }
+                                    />
+                                </div>
+                            </ToolTip>
 
-                    <div onClick={() => setTransformMode('scale')}>
-                        <ToolButton
-                            condition={transformMode === 'scale'}
-                            icon={
-                                <IconResize
-                                    color="currentColor"
-                                    size={isSmall ? 12 : 20}
-                                    stroke={1}
-                                />
-                            }
-                        />
-                    </div>
+                            <ToolTip text="Scale" position="right" delay={100}>
+                                <div onClick={() => setTransformMode('scale')}>
+                                    <ToolButton
+                                        condition={transformMode === 'scale'}
+                                        icon={
+                                            <IconResize
+                                                color="currentColor"
+                                                size={isSmall ? 12 : 20}
+                                                stroke={1}
+                                            />
+                                        }
+                                    />
+                                </div>
+                            </ToolTip>
+                        </>
+                    )}
 
                     {axisMode === 'world' && (
-                        <button
-                            onClick={() => setAxisMode('local')}
-                            className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                        <ToolTip
+                            text="Global axis"
+                            position="right"
+                            delay={100}
                         >
-                            <GlobalModeIcon
-                                color="currentColor"
-                                size={isSmall ? 12 : 20}
-                            />
-                        </button>
+                            <button
+                                onClick={() => setAxisMode('local')}
+                                className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                            >
+                                <GlobalModeIcon
+                                    color="currentColor"
+                                    size={isSmall ? 12 : 20}
+                                />
+                            </button>
+                        </ToolTip>
                     )}
 
                     {axisMode === 'local' && (
-                        <button
-                            onClick={() => setAxisMode('world')}
-                            className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
-                        >
-                            <LocalModeIcon
-                                color="currentColor"
-                                size={isSmall ? 12 : 20}
-                            />
-                        </button>
+                        <ToolTip text="Local axis" position="right" delay={100}>
+                            <button
+                                onClick={() => setAxisMode('world')}
+                                className="cursor-pointer rounded-[8px] p-[8px] font-bold hover:bg-accent/25"
+                            >
+                                <LocalModeIcon
+                                    color="currentColor"
+                                    size={isSmall ? 12 : 20}
+                                />
+                            </button>
+                        </ToolTip>
                     )}
 
                     {selectLines && (
