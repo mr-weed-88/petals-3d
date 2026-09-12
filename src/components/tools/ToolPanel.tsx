@@ -152,7 +152,7 @@ const ToolPanel = ({ isSmall }: ToolPanelProps) => {
                  * pen by choosing another tool, or free the camera with the
                  * orbit lock in the views panel.
                  */
-                setPenActive(true)
+                setPenActive(!penActive)
                 setOpenDrawShapeOptions(false)
                 setEraserActive(false)
                 setSelectLines(false)

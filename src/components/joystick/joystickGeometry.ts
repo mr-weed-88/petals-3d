@@ -65,14 +65,32 @@ export const HUB_RADIUS = 17
 export const CUBE_SIZE = 9
 
 /**
- * Half the length of the rail a cone slides along while it is dragged. Set to
- * reach the widget's outer circle, so the rail reads as the full diameter of
- * the joystick rather than a stub behind the cone.
+ * Half the drawn length of the rail a cone slides along. Deliberately past the
+ * widget's outer circle, so the rail reads as a track the joystick sits on
+ * rather than something contained by it. Needs overflow to stay visible on the
+ * svg, which would otherwise clip at the viewBox edge.
  */
-export const RAIL_LENGTH = 47
+export const RAIL_LENGTH = 62
 
-/** Where the cone is stopped, so a long drag cannot slide it off the rail. */
-export const RAIL_CLAMP = RAIL_LENGTH - 8
+/**
+ * How far from the centre a cone may travel: the whole drawn rail, less enough
+ * for the cone's body to stay on the line rather than hang off the end. Tied
+ * to the rail length so the two can never drift apart, since a handle that
+ * stops short of its own track reads as broken.
+ */
+const CONE_TRAVEL = RAIL_LENGTH - 6
+
+/*
+ * The cone's travel, as an offset from where it rests.
+ *
+ * Clamped by position, not by drag distance. Clamping the drag treated the
+ * cone's resting place as the middle of its range, which it is not: the cone
+ * sits well out from the centre, so there is far more room inwards than
+ * outwards. That stopped the cone before the cube while the selection kept
+ * moving.
+ */
+export const RAIL_MAX_OFFSET = CONE_TRAVEL - CONE_DISTANCE
+export const RAIL_MIN_OFFSET = -CONE_TRAVEL - CONE_DISTANCE
 
 /** Degrees of clearance left at each end of an arc, so it clears the cones. */
 const ARC_GAP = 33

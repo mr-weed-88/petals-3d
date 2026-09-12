@@ -50,6 +50,12 @@
        must read as neutral next to the axis colours: the orientation cube and
        the rail a cone slides along. */
     --c-contrast: #000000;
+    /* The joystick's handles. The system grab hand cannot be recoloured and
+       disappears against a pale panel on some cursor schemes. */
+    --cursor-grab:
+        url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cg%20stroke='%23000000'%20fill='none'%3E%3Ccircle%20cx='12'%20cy='12'%20r='7'%20stroke-width='2'/%3E%3Ccircle%20cx='12'%20cy='12'%20r='1.5'%20stroke-width='2'/%3E%3C/g%3E%3C/svg%3E")
+            12 12,
+        grab;
     /*
      * The drawing cursor. A system crosshair cannot be recoloured, and on a
      * pale canvas it all but vanishes, so it is drawn here instead and swapped
@@ -86,6 +92,10 @@
        would lift the whole page rather than push it back. */
     --c-overlay: #18181b;
     --c-contrast: #ffffff;
+    --cursor-grab:
+        url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cg%20stroke='%23ffffff'%20fill='none'%3E%3Ccircle%20cx='12'%20cy='12'%20r='7'%20stroke-width='2'/%3E%3Ccircle%20cx='12'%20cy='12'%20r='1.5'%20stroke-width='2'/%3E%3C/g%3E%3C/svg%3E")
+            12 12,
+        grab;
     --cursor-draw:
         url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='24'%20height='24'%3E%3Cpath%20d='M12%203v6M12%2015v6M3%2012h6M15%2012h6'%20stroke='%23ffffff'%20stroke-width='2'%20stroke-linecap='round'%20fill='none'/%3E%3C/svg%3E")
             12 12,

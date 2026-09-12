@@ -36,6 +36,9 @@ import {
     CONE_SIZE,
     CUBE_SIZE,
     HUB_RADIUS,
+    RAIL_LENGTH,
+    RAIL_MAX_OFFSET,
+    RAIL_MIN_OFFSET,
     MIN_DEPTH,
     VIEW,
     pairArcPath,
@@ -65,7 +68,8 @@ const HUB_PIXELS_PER_STEP = 1
 /** Degrees of sweep around the widget that make up one rotation step. */
 const DEGREES_PER_STEP = 1
 
-const GRAB = { cursor: 'grab' as const }
+/** Themed, so the handles' cursor is visible on both grounds. */
+const GRAB = { cursor: 'var(--cursor-grab)' }
 
 type HandleKey =
     `cone-${JoystickAxis}` | `arc-${JoystickAxis}` | 'hub' | 'uniform'
@@ -78,6 +82,8 @@ interface DragState {
     pivotX: number
     pivotY: number
     startAngle: number
+    /** SVG user units per screen pixel, so the rail follows the pointer. */
+    unitsPerPixel: number
     /** Steps already applied, so each move only emits the difference. */
     appliedX: number
     appliedY: number
@@ -109,6 +115,7 @@ const Joystick = () => {
     const axes = useRef<AxisScreenMap>(getAxisScreen())
     const svgRef = useRef<SVGSVGElement>(null)
     const coneRefs = useRef(new Map<string, SVGGElement | null>())
+    const slideRefs = useRef(new Map<string, SVGGElement | null>())
     const arcRefs = useRef(new Map<string, SVGPathElement | null>())
     const faceRefs = useRef(new Map<string, SVGPathElement | null>())
     const viewed = useRef(new THREE.Quaternion())
@@ -282,6 +289,7 @@ const Joystick = () => {
                 Math.PI,
             appliedX: 0,
             appliedY: 0,
+            unitsPerPixel: box ? VIEW / box.width : 1,
         }
         setActive(handle)
     }
@@ -306,6 +314,27 @@ const Joystick = () => {
             node?.setAttribute('transform', rotateAbout(want.sweep ?? 0))
         }
 
+        /*
+         * The cone runs along its rail with the pointer, clamped so it cannot
+         * slide off the end. Measured in the rotated frame, so only the
+         * distance along the axis counts and sideways drag is ignored.
+         */
+        if (state.handle.startsWith('cone')) {
+            const axis = state.handle.slice(-1) as JoystickAxis
+            const radians = toRadians(axes.current[axis].angle)
+            const along =
+                (e.clientX - state.originX) * Math.cos(radians) +
+                (e.clientY - state.originY) * Math.sin(radians)
+
+            const offset = Math.max(
+                RAIL_MIN_OFFSET,
+                Math.min(RAIL_MAX_OFFSET, along * state.unitsPerPixel)
+            )
+            slideRefs.current
+                .get(axis)
+                ?.setAttribute('transform', `translate(${offset} 0)`)
+        }
+
         const deltaX = want.x - state.appliedX
         const deltaY = want.y - state.appliedY
         if (deltaX === 0 && deltaY === 0) return
@@ -328,6 +357,12 @@ const Joystick = () => {
                 ?.removeAttribute('transform')
         }
 
+        if (state.handle.startsWith('cone')) {
+            slideRefs.current
+                .get(state.handle.slice(-1) as JoystickAxis)
+                ?.removeAttribute('transform')
+        }
+
         // Only write to the records if something actually moved.
         if (state.appliedX !== 0 || state.appliedY !== 0) target?.commit()
     }
@@ -344,6 +379,10 @@ const Joystick = () => {
         faceRefs.current.set(key, node)
     }
 
+    const keepSlide = (axis: string) => (node: SVGGElement | null) => {
+        slideRefs.current.set(axis, node)
+    }
+
     const initial = getAxisScreen()
     const coneVerb = coneAction === 'move' ? 'Move' : 'Scale'
     const holdingHub = active === 'hub'
@@ -357,7 +396,7 @@ const Joystick = () => {
         : null
 
     return (
-        <div className="absolute right-[12px] bottom-[16px] z-5 flex flex-col items-end gap-[8px]">
+        <div className="absolute right-[12px] bottom-[16px] z-5 flex flex-col items-end gap-[8px] border-1">
             <div className="rounded-full border-[1px] border-line/25 bg-surface p-[6px] drop-shadow-xl">
                 {/*
                  * Labels are native <title> elements. The app's ToolTip renders
@@ -366,6 +405,7 @@ const Joystick = () => {
                 <svg
                     ref={svgRef}
                     viewBox={`0 0 ${VIEW} ${VIEW}`}
+                    overflow="visible"
                     className="size-[132px] touch-none select-none md:size-[156px]"
                     role="group"
                     aria-label="Transform joystick"
@@ -411,27 +451,55 @@ const Joystick = () => {
                             display={spinningAxis ? 'none' : 'inline'}
                         >
                             {/*
-                             * The cone glyph points up, so it is turned a
-                             * further 90 degrees to face outward. The group
-                             * around it carries the axis rotation.
+                             * The rail the cone runs along, shown only while
+                             * that cone is held. It sits inside the rotated
+                             * group, so it lines up with the axis for free and
+                             * needs no geometry of its own per camera change.
                              */}
-                            <g
-                                transform={`translate(${CENTRE + CONE_DISTANCE} ${CENTRE}) rotate(90)`}
-                                data-handle={`cone-${axis}`}
-                                onPointerDown={onDown}
-                                onPointerMove={onMove}
-                                onPointerUp={onUp}
-                                onPointerCancel={onUp}
-                                style={GRAB}
-                            >
-                                <title>{`${coneVerb} ${AXIS_LABEL[axis]}`}</title>
-                                <IconConeFilled
-                                    x={-CONE_SIZE / 2}
-                                    y={-CONE_SIZE / 2}
-                                    width={CONE_SIZE}
-                                    height={CONE_SIZE}
-                                    color={AXIS_COLOR[axis]}
+                            {active === `cone-${axis}` && (
+                                <line
+                                    x1={CENTRE - RAIL_LENGTH}
+                                    y1={CENTRE}
+                                    x2={CENTRE + RAIL_LENGTH}
+                                    y2={CENTRE}
+                                    stroke="var(--c-contrast)"
+                                    strokeWidth={1.2}
+                                    strokeDasharray="2 3"
+                                    strokeLinecap="round"
+                                    pointerEvents="none"
                                 />
+                            )}
+
+                            {/*
+                             * Two nested groups: this one takes the drag
+                             * offset along the rail, the inner one holds the
+                             * cone's resting place. Separating them means the
+                             * offset can be set and cleared without disturbing
+                             * the position or the glyph's own rotation.
+                             */}
+                            <g ref={keepSlide(axis)}>
+                                {/*
+                                 * The cone glyph points up, so it is turned a
+                                 * further 90 degrees to face outward.
+                                 */}
+                                <g
+                                    transform={`translate(${CENTRE + CONE_DISTANCE} ${CENTRE}) rotate(90)`}
+                                    data-handle={`cone-${axis}`}
+                                    onPointerDown={onDown}
+                                    onPointerMove={onMove}
+                                    onPointerUp={onUp}
+                                    onPointerCancel={onUp}
+                                    style={GRAB}
+                                >
+                                    <title>{`${coneVerb} ${AXIS_LABEL[axis]}`}</title>
+                                    <IconConeFilled
+                                        x={-CONE_SIZE / 2}
+                                        y={-CONE_SIZE / 2}
+                                        width={CONE_SIZE}
+                                        height={CONE_SIZE}
+                                        color={AXIS_COLOR[axis]}
+                                    />
+                                </g>
                             </g>
                         </g>
                     ))}
