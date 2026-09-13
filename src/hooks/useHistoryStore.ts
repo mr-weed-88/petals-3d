@@ -2,43 +2,32 @@ import { create } from 'zustand'
 
 import type { HistoryEntry } from '../types/history'
 
-/** Which way an entry is being applied. */
 export type HistoryDirection = 'undo' | 'redo'
 
-/** How many actions can be undone. */
 export const HISTORY_LIMIT = 25
 
 export interface HistoryState {
     past: HistoryEntry[]
     future: HistoryEntry[]
 
-    /**
-     * Set from the moment undo or redo starts until the entry is applied and
-     * written. Every other action is refused while it is set: a half-applied
-     * entry leaves the scene, the document and the stacks disagreeing.
-     */
+    // Set while an entry is applying. Every other action is refused, because a
+    // half-applied entry leaves the scene, document and stacks disagreeing.
     busy: boolean
 
     canUndo: boolean
     canRedo: boolean
 
-    /**
-     * Set by the buttons, cleared by the bridge inside the canvas. The buttons
-     * are ordinary DOM and cannot reach the scene graph, so they ask for an
-     * undo rather than performing one.
-     */
+    // Set by the buttons, cleared by the bridge. The buttons are ordinary DOM
+    // and cannot reach the scene graph, so they ask rather than perform.
     pending: HistoryDirection | null
 
-    /** Records a completed action. Clears the redo stack, as any editor does. */
     push: (entry: HistoryEntry) => void
 
-    /** Asks for an undo or redo. Locks the editor if there is work to do. */
     request: (direction: HistoryDirection) => void
 
-    /** Moves one entry between the stacks. Called by the bridge only. */
     take: () => { entry: HistoryEntry; direction: HistoryDirection } | null
 
-    /** Releases the lock. Must run even if applying threw. */
+    // Must run even if applying threw.
     finish: () => void
 
     clear: () => void
@@ -53,8 +42,7 @@ export const historyStore = create<HistoryState>((set, get) => ({
     pending: null,
 
     push: (entry) => {
-        // Refusing while applying is what keeps undo's own writes out of
-        // the history.
+        // Keeps undo's own writes out of the history.
         if (get().busy) return
 
         const past = [...get().past, entry].slice(-HISTORY_LIMIT)
@@ -67,8 +55,7 @@ export const historyStore = create<HistoryState>((set, get) => ({
         if (direction === 'undo' && past.length === 0) return
         if (direction === 'redo' && future.length === 0) return
 
-        // Locked here rather than when the bridge picks it up, so nothing can
-        // land in the gap between asking and applying.
+        // Locked here, not when the bridge picks it up, so nothing lands between.
         set({ busy: true, pending: direction })
     },
 

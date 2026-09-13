@@ -34,7 +34,6 @@ function forEachMaterial(
     }
 }
 
-/** Gizmo for moving, rotating and scaling a selected guide surface. */
 const TransformGuide = () => {
     const { camera, pointer, raycaster, scene, gl, invalidate } = useThree()
     const { axisMode, pointerType, transformMode } = canvasDrawStore(
@@ -138,11 +137,8 @@ const TransformGuide = () => {
         highlighted.current.clear()
     }
 
-    /*
-     * A guide has no stored record, so the only state a transform changes is
-     * the mesh itself. Both sides are captured as world transforms, which is
-     * what the meshes hold once undo has released the selection.
-     */
+    // A guide has no stored record, so both sides are world transforms of the
+    // meshes themselves.
     const transformBefore = useRef<ObjectTransformSnapshot[]>([])
 
     const captureTransformBefore = () => {
@@ -253,7 +249,6 @@ const TransformGuide = () => {
 
             highlighted.current.clear()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     useEffect(() => {
@@ -262,12 +257,10 @@ const TransformGuide = () => {
         controls.setMode(transformMode)
         controls.setSpace(axisMode)
         hideGizmoPlanes(controls.getHelper())
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [transformMode, axisMode])
 
     // The legacy gizmo only attaches in legacy mode. Selection and commit are
-    // the same either way, which is what lets the joystick drive a guide
-    // through exactly the path it drives a line selection through.
+    // the same either way, which is what lets the joystick drive a guide.
     useEffect(() => {
         const controls = transformRef.current
         if (!controls) return
@@ -283,8 +276,7 @@ const TransformGuide = () => {
         }
     }, [attachedGizmos, scene, transformStyle])
 
-    // Publishes the proxy Group for the joystick, which lives outside the
-    // canvas and cannot reach into the scene graph.
+    // Publishes the proxy Group for the joystick.
     useEffect(() => {
         if (!attachedGizmos || transformStyle !== 'joystick') {
             setTarget(null)
@@ -300,12 +292,8 @@ const TransformGuide = () => {
         return () => setTarget(null)
     }, [attachedGizmos, transformStyle, setTarget])
 
-    /**
-     * Hands the selection back to the scene, so each guide holds its own world
-     * transform again. Undo calls this before restoring anything, because a
-     * stored world transform written onto a still-parented mesh composes with
-     * the proxy group's and puts the guide somewhere else.
-     */
+    // Hands the selection back to the scene so each guide holds its own world
+    // transform again. Undo calls this before restoring anything.
     const releaseSelection = useCallback(() => {
         const dummy = dummyTarget.current
         const controls = transformRef.current
@@ -401,7 +389,6 @@ const TransformGuide = () => {
             window.removeEventListener('pointerdown', onPointerDown)
             window.removeEventListener('pointerup', onPointerUp)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [draggingSelection, attachedGizmos])
 
     useFrame(() => {

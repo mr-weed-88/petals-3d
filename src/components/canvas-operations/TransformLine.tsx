@@ -279,7 +279,6 @@ const TransformLine = () => {
             gl.info.autoReset = false
             gl.info.reset()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [camera, gl, scene])
 
     useEffect(() => {
@@ -350,7 +349,6 @@ const TransformLine = () => {
         })
 
         return () => setTarget(null)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [attachedGizmos, transformStyle, setTarget])
 
     useEffect(() => {
@@ -498,7 +496,6 @@ const TransformLine = () => {
             window.removeEventListener('pointerdown', onPointerDownWindow)
             window.removeEventListener('pointerup', onPointerUpWindow)
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [draggingSelection, attachedGizmos, selectLines])
 
     useFrame(() => {
@@ -577,7 +574,6 @@ const TransformLine = () => {
         }
 
         invalidate()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [lineColor, selectLines, invalidate])
 
     useEffect(() => {
@@ -671,7 +667,6 @@ const TransformLine = () => {
         ])
 
         notifySuccess(`${clones.length} curves copied!`)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [copy, scene, selectLines, setCopy, setActiveScene])
 
     useEffect(() => {
@@ -831,7 +826,6 @@ const TransformLine = () => {
         isMerging.current = false
         setActiveScene(scene)
         setSelectLines(!selectLines)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [mergeGeometries, scene, setActiveScene])
 
     return null

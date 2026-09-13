@@ -61,7 +61,6 @@ export default function CanvasOperations() {
         setGroupData([...newGeneratedGroups])
         setActiveScene(newScene)
         void saveData()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     /** A finished guide ribbon becomes the surface the pen now draws onto. */
@@ -88,7 +87,6 @@ export default function CanvasOperations() {
 
     useEffect(() => {
         setActiveScene(scene)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     /** Disposes meshes the eraser marked, once per scene change. */
@@ -147,7 +145,6 @@ export default function CanvasOperations() {
 
             setHighlighted([])
             setEraseGuide(false)
-            // eslint-disable-next-line react-hooks/exhaustive-deps
         }, [scene, gl])
 
         return null
@@ -170,7 +167,6 @@ export default function CanvasOperations() {
             const group = groupsByUuid.get(child.userData.group_id)
             child.visible = group ? group.visible : false
         })
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [groupData])
 
     return (

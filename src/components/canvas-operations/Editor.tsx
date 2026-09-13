@@ -166,7 +166,6 @@ const Editor = () => {
         hasRun.current = true
 
         void fetchNoteData()
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
     const fetchNoteData = async () => {

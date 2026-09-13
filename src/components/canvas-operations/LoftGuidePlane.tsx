@@ -252,7 +252,6 @@ const LoftGuidePlane = ({ onDrawingFinished }: LoftGuidePlaneProps) => {
 
             invalidate()
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         generateLoftSurface,
         loftGuidePlane,

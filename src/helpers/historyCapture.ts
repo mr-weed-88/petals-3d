@@ -8,7 +8,6 @@ import type {
     ToolSnapshot,
 } from '../types/history'
 
-/** The tool in hand and the flyout under it, as undo will need to restore it. */
 export function toolSnapshot(): ToolSnapshot {
     const s = canvasDrawStore.getState()
     return {
@@ -36,7 +35,6 @@ export function toolSnapshot(): ToolSnapshot {
     }
 }
 
-/** Puts the tool panel back the way the snapshot found it. */
 export function applyToolSnapshot(tool: ToolSnapshot): void {
     const s = canvasDrawStore.getState()
 
@@ -81,11 +79,8 @@ export function applyRenderSnapshot(snapshot: RenderSnapshot): void {
     s.setCanvasBackgroundColor(snapshot.canvasBackgroundColor)
 }
 
-/**
- * True when a patch would actually change something. An operation that ran but
- * touched nothing still produces a patch, and those fill the stacks with
- * entries that undo to no visible effect.
- */
+// An operation that ran but touched nothing still produces a patch, and those
+// fill the stacks with entries that undo to no visible effect.
 function patchIsMeaningful(patch: HistoryPatch): boolean {
     switch (patch.kind) {
         case 'lines-added':
@@ -97,7 +92,6 @@ function patchIsMeaningful(patch: HistoryPatch): boolean {
         case 'lines-transformed':
             return patch.before.length > 0 && patch.after.length > 0
         case 'lines-recoloured':
-            // A recolour that set every line to the colour it already had.
             return (
                 patch.uuids.length > 0 &&
                 patch.before.some((colour) => colour !== patch.after)
@@ -107,8 +101,7 @@ function patchIsMeaningful(patch: HistoryPatch): boolean {
                 groupsSignature(patch.before) !== groupsSignature(patch.after)
             )
         case 'guide-transformed':
-            // The legacy gizmo fires its drag events on a click that never
-            // moved, which would otherwise fill the stack with no-ops.
+            // The legacy gizmo fires drag events on a click that never moved.
             return (
                 patch.before.length > 0 &&
                 !objectTransformsEqual(patch.before, patch.after)
@@ -120,13 +113,8 @@ function patchIsMeaningful(patch: HistoryPatch): boolean {
     }
 }
 
-/**
- * Records one completed user action.
- *
- * `toolBefore` is only needed from operations that change the tool themselves,
- * such as finishing a guide, which switches the pen on. Everything else leaves
- * it alone, so before and after are the same.
- */
+// `toolBefore` is only needed from operations that change the tool themselves,
+// such as finishing a guide, which switches the pen on.
 export function pushHistory(
     label: string,
     patches: HistoryPatch[],
@@ -144,7 +132,6 @@ export function pushHistory(
     })
 }
 
-/** True while an undo or redo is being applied, when nothing else may act. */
 export function historyBusy(): boolean {
     return historyStore.getState().busy
 }
@@ -153,15 +140,9 @@ export function historyBusy(): boolean {
    drag would otherwise be one entry per pixel of travel. */
 let renderBurst: { label: string; before: RenderSnapshot } | null = null
 
-/**
- * Opens a render burst, if one is not already open. Call it immediately before
- * writing a setting, so the snapshot is the value being replaced.
- *
- * A drag commits on its own release. A discrete click commits on the next
- * release anywhere, because onChange runs from the click handler, which fires
- * after that gesture's pointerup. Still in time for undo: the next release
- * always precedes the next click.
- */
+// Call immediately before writing a setting, so the snapshot is the value being
+// replaced. A drag commits on its own release; a click commits on the next
+// release anywhere, which still precedes the next click handler.
 export function noteRenderChange(label: string): void {
     // Refused while applying, or undo's own render writes would be recorded.
     if (historyBusy()) return

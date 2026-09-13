@@ -10,9 +10,7 @@ interface Rgb {
 
 interface Hsv {
     h: number
-
     s: number
-
     v: number
 }
 
@@ -135,7 +133,6 @@ const ColorPicker = ({ value, onChange, isSmall }: ColorPickerProps) => {
         const nextHex = rgbToHex(r, g, b)
         if (!typing && nextHex !== inputHex) setInputHex(nextHex)
         onChange?.(nextHex)
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [hue, sat, val])
 
     const handleHexFocus = () => setTyping(true)

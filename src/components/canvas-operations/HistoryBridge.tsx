@@ -22,7 +22,6 @@ import {
 import { isLineMesh, type LineRecord } from '../../types/domain'
 import type { HistoryPatch } from '../../types/history'
 
-/** Every line mesh in the scene, indexed by the record it carries. */
 function meshesByUuid(scene: THREE.Scene): Map<string, THREE.Mesh> {
     const found = new Map<string, THREE.Mesh>()
     scene.traverse((child) => {
@@ -39,11 +38,7 @@ function removeMesh(scene: THREE.Scene, mesh: THREE.Mesh): void {
     else material.dispose()
 }
 
-/**
- * Applies one patch in one direction. Records are mutated in place rather than
- * replaced: a mesh's userData is the record itself, so swapping the object
- * would leave the scene holding the old one.
- */
+// Records are mutated in place, not replaced: a mesh's userData is the record.
 async function applyPatch(
     patch: HistoryPatch,
     direction: HistoryDirection,
@@ -62,8 +57,7 @@ async function applyPatch(
             if (!group) return
 
             if (adding) {
-                // Clones, so a redo cannot hand the scene the record object
-                // the history is still holding.
+                // Clone: the history still holds these records.
                 const restored = patch.lines.map(cloneLineRecord)
                 group.objects.push(...restored)
                 restored.forEach((line) =>
@@ -113,8 +107,6 @@ async function applyPatch(
         }
 
         case 'lines-flagged': {
-            // Erase flags the record and hides the mesh, so coming back is a
-            // matter of clearing the flag rather than rebuilding.
             const deleted =
                 direction === 'undo' ? !patch.deleted : patch.deleted
             const touched: LineRecord[] = []
@@ -127,18 +119,14 @@ async function applyPatch(
 
                     const mesh = meshes.get(line.uuid)
                     if (!mesh) {
-                        // "Erase Guide" disposes every mesh flagged deleted, so
-                        // there may be nothing left to unhide. The record still
-                        // holds the samples, so replay the stroke from them.
+                        // "Erase Guide" disposed it. Replay from the samples.
                         if (!deleted) scene.add(buildLineMesh(scene, line))
                         continue
                     }
 
                     mesh.visible = !deleted
 
-                    // The eraser fades what it is about to remove. Showing the
-                    // mesh without restoring the record's own appearance leaves
-                    // it at half opacity.
+                    // The eraser faded it to 0.5. Restore from the record.
                     const materials = Array.isArray(mesh.material)
                         ? mesh.material
                         : [mesh.material]
@@ -173,8 +161,6 @@ async function applyPatch(
                     applyTransform(line, snapshot)
                     touched.push(line)
 
-                    // Geometry is unchanged by a transform, so the mesh only
-                    // needs its matrix put back.
                     const mesh = meshes.get(line.uuid)
                     if (mesh) {
                         mesh.position.copy(line.position)
@@ -229,15 +215,8 @@ async function applyPatch(
         case 'groups-changed': {
             const wanted = direction === 'undo' ? patch.before : patch.after
 
-            /*
-             * The whole list is replaced, not patched in place: a group that
-             * is no longer in the document could not otherwise come back.
-             *
-             * Copies, so the store never holds the wrapper the entry holds.
-             * Their `objects` arrays stay shared, and line records outlive a
-             * group deletion on disk until the next load sweeps them, so a
-             * deleted group returns with its strokes intact.
-             */
+            // Replaced wholesale, so a deleted group can come back. Copied, so
+            // the store never holds the wrapper the entry holds.
             const restored = wanted.map((group) => ({ ...group }))
 
             render.setGroupData(restored)
@@ -257,26 +236,20 @@ async function applyPatch(
         }
 
         case 'guide-transformed': {
-            // Nothing to write: a guide lives only in the scene. The selection
-            // has already been released, so each object is a direct child of
-            // the scene and its stored world transform is its local one.
+            // A guide lives only in the scene, so there is nothing to write.
             const wanted = direction === 'undo' ? patch.before : patch.after
             wanted.forEach(applyObjectTransform)
             break
         }
 
         case 'guide-changed':
-            // Guides are not persisted, so there is nothing to restore beyond
-            // the tool state the entry already carries.
+            // Guides are not persisted, so only the tool state is restored.
             break
     }
 }
 
-/**
- * Performs undo and redo. It lives inside the canvas because applying a patch
- * touches the scene graph, which the buttons cannot reach. They set a request
- * on the store; this applies it and releases the lock.
- */
+// Lives inside the canvas because applying a patch touches the scene graph,
+// which the buttons cannot reach.
 const HistoryBridge = () => {
     const { scene, invalidate } = useThree()
     const pending = historyStore((state) => state.pending)
@@ -294,16 +267,10 @@ const HistoryBridge = () => {
             const { entry, direction } = taken
 
             try {
-                /*
-                 * The selection goes back to the scene first. While it is held
-                 * every selected mesh is a child of the proxy group, so its
-                 * transform composes with the group's; stored transforms are
-                 * world transforms, so writing one onto a still-parented mesh
-                 * puts the line somewhere else entirely.
-                 */
+                // Release first: a stored world transform written onto a mesh
+                // still parented to the proxy group composes with it.
                 transformTargetStore.getState().releaseSelection?.()
 
-                // Undo unwinds the patches in the reverse order they applied.
                 const ordered =
                     direction === 'undo'
                         ? [...entry.patches].reverse()
@@ -324,7 +291,7 @@ const HistoryBridge = () => {
             } catch (error) {
                 console.error('Failed to apply a history entry', error)
             } finally {
-                // Released even on failure, or the editor would stay locked.
+                // Must run on failure too, or the editor stays locked.
                 historyStore.getState().finish()
             }
         }

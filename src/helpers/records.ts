@@ -2,13 +2,8 @@ import * as THREE from 'three'
 
 import type { Group, LineRecord } from '../types/domain'
 
-/**
- * Every deliberate copy of a line record goes through here.
- *
- * A mesh's `userData` is the record itself, not a copy, so a record has two
- * owners: the scene graph and the group it belongs to. Anything keeping a
- * record it did not clone will watch its own data change underneath it.
- */
+// A mesh's `userData` is the record itself, so nothing may keep a record it
+// did not clone.
 export function cloneLineRecord(line: LineRecord): LineRecord {
     return {
         ...line,
@@ -22,11 +17,6 @@ export function cloneLineRecord(line: LineRecord): LineRecord {
     }
 }
 
-/**
- * Finds a record anywhere in the document. Searching only the active group
- * returned nothing when there was none, so the operation persisted nothing and
- * recorded no history entry.
- */
 export function findLineRecord(
     groups: Group[],
     uuid: string
@@ -38,13 +28,11 @@ export function findLineRecord(
     return undefined
 }
 
-/** The transform of one line, which is all a move, rotate or scale changes. */
 export interface TransformSnapshot {
     uuid: string
     position: [number, number, number]
     rotation: [number, number, number, number]
     scale: [number, number, number]
-    /** Rewritten on every transform, so it travels with the rest. */
     loft_points: number[]
 }
 
@@ -66,7 +54,6 @@ export function snapshotTransform(line: LineRecord): TransformSnapshot {
     }
 }
 
-/** Writes a transform snapshot back onto a live record, in place. */
 export function applyTransform(
     line: LineRecord,
     snapshot: TransformSnapshot
@@ -87,13 +74,7 @@ export function applyTransform(
     }
 }
 
-/**
- * The transform of a scene object that has no stored record of its own.
- *
- * Guide surfaces are live meshes and nothing else, so a patch about one has to
- * hold the mesh itself. History is session-scoped, so the reference is always
- * still the object on screen.
- */
+// A guide has no stored record, so a patch about one holds the mesh itself.
 export interface ObjectTransformSnapshot {
     object: THREE.Object3D
     position: [number, number, number]
@@ -105,7 +86,7 @@ const scratchPosition = new THREE.Vector3()
 const scratchRotation = new THREE.Quaternion()
 const scratchScale = new THREE.Vector3()
 
-/** World transform, because a selected object is a child of the proxy group. */
+// World transform: a selected object is a child of the proxy group.
 export function snapshotObjectTransform(
     object: THREE.Object3D
 ): ObjectTransformSnapshot {
@@ -125,10 +106,7 @@ export function snapshotObjectTransform(
     }
 }
 
-/**
- * Writes one back. Only correct once the object is a direct child of the
- * scene again, which is why undo releases the selection first.
- */
+// Only correct once the object is a direct child of the scene again.
 export function applyObjectTransform(snapshot: ObjectTransformSnapshot): void {
     const { object } = snapshot
     object.position.set(...snapshot.position)
@@ -137,7 +115,6 @@ export function applyObjectTransform(snapshot: ObjectTransformSnapshot): void {
     object.updateMatrixWorld(true)
 }
 
-/** True when a drag ended where it started, so nothing is worth recording. */
 export function objectTransformsEqual(
     a: ObjectTransformSnapshot[],
     b: ObjectTransformSnapshot[]
@@ -155,22 +132,14 @@ export function objectTransformsEqual(
     })
 }
 
-/**
- * The whole group list, as copied wrappers.
- *
- * The `objects` arrays are shared with the live groups on purpose: a stroke
- * drawn after the patch was recorded lands in that same array, so it survives
- * the patch being reversed. Copying them would make undoing a rename delete
- * every stroke drawn since.
- */
+// The `objects` arrays stay shared with the live groups, so a stroke drawn
+// after the patch was recorded survives the patch being reversed.
 export function snapshotGroups(groups: Group[]): Group[] {
     return groups.map((group) => ({ ...group }))
 }
 
-/**
- * A cheap identity for comparing two group lists. `JSON.stringify` would walk
- * every point of every stroke.
- */
+// Cheap identity for comparing group lists. JSON.stringify would walk every
+// point of every stroke.
 export function groupsSignature(groups: Group[]): string {
     return groups
         .map((group) =>
